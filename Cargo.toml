@@ -1,0 +1,11 @@
+[package]
+name = "nonce_guess"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+yew = { version = "0.20.0", features = ["csr"] }
+web-sys = { version = "0.3", features = ["HtmlElement", "HtmlInputElement", "Node"] }
+thousands = "0.2.0"
+
