@@ -1,2 +1,5 @@
 /target
-/dist
+dist
+*.db
+*shm
+*wal

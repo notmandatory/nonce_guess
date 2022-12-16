@@ -1,0 +1,2 @@
+CREATE TABLE target (block INTEGER PRIMARY KEY, nonce INTEGER) WITHOUT ROWID;
+CREATE TABLE guess (player_name TEXT NOT NULL, block INTEGER NOT NULL REFERENCES target (block), nonce INTEGER NOT NULL, UNIQUE(player_name, block));

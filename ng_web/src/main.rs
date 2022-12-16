@@ -1,5 +1,6 @@
-use web_sys::HtmlInputElement;
+use ng_model::{sort_guesses_by_target_diff, Guess};
 use thousands::Separable;
+use web_sys::HtmlInputElement;
 use yew::prelude::*;
 
 pub enum Msg {
@@ -8,7 +9,7 @@ pub enum Msg {
 }
 
 pub struct App {
-    guesses: Vec<(String, u32)>,
+    guesses: Vec<Guess>,
     target_nonce: Option<u32>,
     guess_refs: (NodeRef, NodeRef),
     target_nonce_ref: NodeRef,
@@ -27,14 +28,21 @@ fn error_is_hidden(error: &String) -> Option<String> {
 
 impl App {
     fn sort_guesses(&mut self) {
-        if self.target_nonce.is_some() {
-            let target = self.target_nonce.unwrap();
-            self.guesses.sort_by(|a, b| {
-                let target_a = target.abs_diff(a.1);
-                let target_b = target.abs_diff(b.1);
-                target_a.cmp(&target_b)
-            })
+        if let Some(target) = self.target_nonce {
+            sort_guesses_by_target_diff(&mut self.guesses, target)
         }
+        // match self.target_nonce {
+        //     Some(target) => sort_guesses_by_target_diff(&mut self.guesses, target),
+        //     None => {}
+        // }
+        // if self.target_nonce.is_some() {
+        //     let target = self.target_nonce.unwrap();
+        //     self.guesses.sort_by(|a, b| {
+        //         let target_a = target.abs_diff(a.1);
+        //         let target_b = target.abs_diff(b.1);
+        //         target_a.cmp(&target_b)
+        //     })
+        // }
     }
 }
 
@@ -77,7 +85,11 @@ impl Component for App {
 
                 if name_error.is_empty() && guess_error.is_empty() {
                     let guess_value_u32 = u32::from_str_radix(guess_value.as_str(), 16).unwrap();
-                    self.guesses.push((name_value, guess_value_u32));
+                    self.guesses.push(Guess {
+                        player_name: name_value,
+                        nonce: guess_value_u32,
+                        block: 0, // TODO show user block number they're guessing
+                    });
                     self.name_error = String::default();
                     self.guess_error = String::default();
                     name_ref.set_value("");
@@ -85,7 +97,7 @@ impl Component for App {
                 }
                 self.sort_guesses();
                 true
-            },
+            }
             Msg::SetNonce => {
                 let target_nonce_ref = &self.target_nonce_ref.cast::<HtmlInputElement>().unwrap();
                 let target_nonce_value = target_nonce_ref.value();
@@ -96,7 +108,8 @@ impl Component for App {
                 }
 
                 if target_nonce_error.is_empty() {
-                    let target_nonce_value_u32 = u32::from_str_radix(target_nonce_value.as_str(), 16).unwrap();
+                    let target_nonce_value_u32 =
+                        u32::from_str_radix(target_nonce_value.as_str(), 16).unwrap();
                     self.target_nonce = Some(target_nonce_value_u32);
                     self.target_nonce_error = String::default();
                     target_nonce_ref.set_value("");
@@ -108,7 +121,6 @@ impl Component for App {
     }
 
     fn view(&self, ctx: &Context<Self>) -> Html {
-
         html! {
             <div class="section">
                 <div class="container">
@@ -207,13 +219,13 @@ impl Component for App {
                                     </thead>
                                     <tbody>
                                     {
-                                        self.guesses.clone().into_iter().enumerate().map(|(pos, (name, guess))| {
+                                        self.guesses.clone().into_iter().enumerate().map(|(pos, guess)| {
                                             html!{
-                                            <tr key={ name.clone() }>
+                                            <tr key={ guess.player_name.clone() }>
                                                 <th>{ &pos }</th>
-                                                <td>{ &name }</td>
-                                                <td class="is-family-monospace">{ format!("{:08X}", &guess) }</td>
-                                                <td class="is-family-monospace is-pulled-right">{ format!("{}", &guess.separate_with_commas()) }</td>
+                                                <td>{ &guess.player_name }</td>
+                                                <td class="is-family-monospace">{ format!("{:08X}", &guess.nonce) }</td>
+                                                <td class="is-family-monospace is-pulled-right">{ format!("{}", &guess.nonce.separate_with_commas()) }</td>
                                             </tr>
                                         }}).collect::<Html>()
                                     }

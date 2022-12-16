@@ -1,0 +1,21 @@
+[package]
+name = "ng_server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ng_model = { path = "../ng_model" }
+log = "0.4"
+sqlx = { version = "0.5.10", features = ["runtime-tokio-rustls", "any", "sqlite", "migrate"] }
+thiserror = "1"
+axum = { version = "0.5" }
+axum-extra = { version = "0.3.7", features = ["spa"] }
+tokio = { version = "1.21", features = ["full"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.3", features = ["fs", "trace"] }
+rust-embed = { version = "6.4" }
+mime_guess = { version = "2" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
