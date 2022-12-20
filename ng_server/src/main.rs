@@ -5,13 +5,13 @@ use axum::http::{header, Uri};
 use axum::response::{IntoResponse, Response, Result};
 use axum::{http::StatusCode, routing::get, Json, Router};
 
+use axum::routing::{on, MethodFilter};
 use ng_model::serde_with::serde_as;
 use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;
 use std::ops::Add;
 use std::str::FromStr;
 use std::sync::Arc;
-use axum::routing::{MethodFilter, on};
 
 use tracing;
 
@@ -71,10 +71,7 @@ async fn main() {
                 .post(post_target_block)
                 .put(put_target_nonce),
         )
-        .route(
-            "/guesses/:block",
-            get(get_guesses)
-        )
+        .route("/guesses/:block", get(get_guesses))
         .route("/guesses", on(MethodFilter::POST, post_guess))
         .layer(Extension(shared_state));
 

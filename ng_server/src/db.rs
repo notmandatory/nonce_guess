@@ -58,7 +58,7 @@ impl<'c> Db for Transaction<'c, Sqlite> {
 
     async fn insert_guess(&mut self, guess: Guess) -> Result<(), Error> {
         let query = sqlx::query("INSERT INTO guess (player_name, block, nonce) VALUES (?, ?, ?)")
-            .bind(guess.player_name)
+            .bind(guess.name)
             .bind(guess.block)
             .bind(guess.nonce);
         query
@@ -99,7 +99,7 @@ impl FromRow<'_, SqliteRow> for GuessRow {
         let block = row.get::<u32, usize>(1);
         let nonce = row.get::<u32, usize>(2);
         Ok(GuessRow(Guess {
-            player_name,
+            name: player_name,
             block,
             nonce,
         }))

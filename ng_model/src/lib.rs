@@ -14,8 +14,8 @@ pub struct Target {
 /// A players guess for a target block nonce.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct Guess {
-    pub player_name: String,
     pub block: u32,
+    pub name: String,
     pub nonce: u32,
 }
 

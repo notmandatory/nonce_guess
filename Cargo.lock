@@ -605,7 +605,7 @@ dependencies = [
  "gloo-events",
  "gloo-utils",
  "serde",
- "serde-wasm-bindgen",
+ "serde-wasm-bindgen 0.3.1",
  "serde_urlencoded",
  "thiserror",
  "wasm-bindgen",
@@ -1050,8 +1050,15 @@ dependencies = [
 name = "ng_web"
 version = "0.1.0"
 dependencies = [
+ "gloo-net",
+ "gloo-utils",
+ "log",
  "ng_model",
+ "serde-wasm-bindgen 0.4.5",
  "thousands",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "wasm-logger",
  "web-sys",
  "yew",
 ]
@@ -1485,6 +1492,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "618365e8e586c22123d692b72a7d791d5ee697817b65a218cdf12a98870af0f7"
 dependencies = [
  "fnv",
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3b4c031cd0d9014307d82b8abf653c0290fbdaeb4c02d00c63cf52f728628bf"
+dependencies = [
  "js-sys",
  "serde",
  "wasm-bindgen",
@@ -2211,6 +2229,17 @@ name = "wasm-bindgen-shared"
 version = "0.2.83"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c38c045535d93ec4f0b4defec448e4291638ee608530863b1e2ba115d4fff7f"
+
+[[package]]
+name = "wasm-logger"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "074649a66bb306c8f2068c9016395fa65d8e08d2affcbf95acf3c24c3ab19718"
+dependencies = [
+ "log",
+ "wasm-bindgen",
+ "web-sys",
+]
 
 [[package]]
 name = "web-sys"
