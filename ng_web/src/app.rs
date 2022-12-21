@@ -4,6 +4,7 @@ use gloo_net::http::Request;
 use log::{debug, info};
 use ng_model::{sort_guesses_by_target_diff, Guess, Target};
 use std::rc::Rc;
+use std::str::FromStr;
 use thousands::Separable;
 use yew::prelude::*;
 use yew::{function_component, Reducible};
@@ -17,8 +18,8 @@ pub struct AppState {
 pub enum AppAction {
     SetTarget(Target),
     SetGuesses(Vec<Guess>),
-    // AddGuess(Guess),
     SetBlock(u32),
+    SetNonce(u32),
 }
 
 impl Reducible for AppState {
@@ -36,41 +37,19 @@ impl Reducible for AppState {
                 target: self.target.clone(),
             }
             .into(),
-            // AppAction::AddGuess(guess) => {
-            //     {
-            //         let guess = guess.clone();
-            //         wasm_bindgen_futures::spawn_local(async move {
-            //             let post_guess_result = Request::post("/api/guesses")
-            //                 .json(&guess)
-            //                 .unwrap()
-            //                 .send()
-            //                 .await
-            //                 .unwrap();
-            //             debug!("post_guess_result: {:?}", post_guess_result);
-            //         });
-            //     }
-            //     let mut guesses = vec![guess];
-            //     guesses.append(&mut self.guesses.clone().unwrap_or_default());
-            //     let target = self.target.clone();
-            //     if let Some(Target {
-            //         block: _,
-            //         nonce: Some(nonce),
-            //     }) = target
-            //     {
-            //         sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce)
-            //     };
-            //     AppState {
-            //         guesses: Some(guesses),
-            //         target: self.target.clone(),
-            //     }
-            // }
-            // .into(),
             AppAction::SetBlock(block) => {
+                AppState {
+                    guesses: None,
+                    target: Some(Target { block, nonce: None }),
+                }
+            }
+            .into(),
+            AppAction::SetNonce(nonce) => {
                 AppState {
                     guesses: self.guesses.clone(),
                     target: Some(Target {
-                        block,
-                        nonce: self.target.clone().unwrap().nonce,
+                        block: self.target.clone().unwrap().block,
+                        nonce: Some(nonce),
                     }),
                 }
             }
@@ -131,9 +110,7 @@ pub fn app() -> Html {
         Callback::from(move |guess: Guess| {
             debug!("new player guess: {:?}", &guess);
             let state = state.clone();
-            let guess = guess.clone();
             {
-                let guess = guess.clone();
                 wasm_bindgen_futures::spawn_local(async move {
                     let post_guess_result = Request::post("/api/guesses")
                         .json(&guess)
@@ -187,11 +164,47 @@ pub fn app() -> Html {
         })
     };
 
+    let onclick_update_nonce = {
+        let state = state.clone();
+        Callback::from(move |_| {
+            {
+                let state = state.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    let get_nonce_result = Request::get("/api/target/nonce")
+                        .send()
+                        .await
+                        .unwrap()
+                        .text()
+                        .await;
+                    debug!("get_nonce_result: {:?}", get_nonce_result);
+                    if let Ok(nonce) = get_nonce_result {
+                        //let nonce = get_nonce_result.unwrap();
+                        if !nonce.is_empty() {
+                            let nonce = u32::from_str(nonce.as_str()).unwrap();
+                            debug!("get_nonce_result: {}", nonce);
+                            state.dispatch(AppAction::SetNonce(nonce));
+                            if let Some(mut guesses) = state.guesses.clone() {
+                                sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce);
+                                state.dispatch(AppAction::SetGuesses(guesses));
+                            }
+                        }
+                    } else {
+                        // TODO else display an error
+                        debug!("get nonce error: {:?}", get_nonce_result);
+                    }
+                });
+            }
+        })
+    };
+
     if let Some(target) = target {
         html! {
             <div class="section">
                 <div class="container">
-                    <h1 class="title">{ "Guess the Next Block Nonce" }</h1>
+                    <h1 class="title"><span>
+                        <img src="/img/apple-touch-icon.png" width="75" height="75"/>
+                        { "Guess the Block Nonce" }
+                    </span></h1>
                     <div class="columns">
                         <div class="column is-one-third">
                             <GuessEntry block={ target.block } onaddguess={ on_add_guess }/>
@@ -222,6 +235,9 @@ pub fn app() -> Html {
                                                 </tr>
                                             </tbody>
                                         </table>
+                                        <div class="control">
+                                            <button class = "button is-link" onclick={ onclick_update_nonce }>{"Update"}</button>
+                                        </div>
                                     </div>
                                 }
                             }
@@ -238,7 +254,7 @@ pub fn app() -> Html {
                                     </thead>
                                     <tbody>
                                     {
-                                        (*state).clone().guesses.unwrap_or(vec!()).clone().into_iter().enumerate().map(|(pos, guess)| {
+                                        (*state).clone().guesses.unwrap_or_default().clone().into_iter().enumerate().map(|(pos, guess)| {
                                             html!{
                                             <tr key={ guess.name.clone() }>
                                                 <th>{ &pos }</th>

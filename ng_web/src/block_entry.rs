@@ -72,16 +72,15 @@ pub fn block_entry(props: &BlockEntryProps) -> Html {
                     onsetblock.emit(decimal_block);
                     state.dispatch(BlockEntryAction::Clear);
                 } else {
-                    state.dispatch(BlockEntryAction::SetBlockError(
-                        format!("Block '{}' is not a valid decimal.", &block).to_string(),
-                    ))
+                    state.dispatch(BlockEntryAction::SetBlockError(format!(
+                        "Block '{}' is not a valid decimal.",
+                        &block
+                    )))
                 }
-            } else {
-                if state.block.is_none() {
-                    state.dispatch(BlockEntryAction::SetBlockError(
-                        "Block must be set.".to_string(),
-                    ));
-                }
+            } else if state.block.is_none() {
+                state.dispatch(BlockEntryAction::SetBlockError(
+                    "Block must be set.".to_string(),
+                ));
             }
         }
     };

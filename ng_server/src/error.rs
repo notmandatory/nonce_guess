@@ -13,11 +13,19 @@ pub enum Error {
     SerdeJson(serde_json::Error),
     #[error("generic: {0}")]
     Generic(String),
+    #[error("reqwest: {0}")]
+    Reqwest(reqwest::Error),
 }
 
 impl From<sqlx::Error> for Error {
     fn from(err: sqlx::Error) -> Self {
         Error::Db(err)
+    }
+}
+
+impl From<reqwest::Error> for Error {
+    fn from(err: reqwest::Error) -> Self {
+        Error::Reqwest(err)
     }
 }
 
@@ -27,6 +35,7 @@ impl IntoResponse for Error {
             Error::Db(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             Error::SerdeJson(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             Error::Generic(e) => (StatusCode::INTERNAL_SERVER_ERROR, e),
+            Error::Reqwest(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
 
         let body = Json(json!({

@@ -19,6 +19,14 @@ pub struct Guess {
     pub nonce: u32,
 }
 
+/// A players guess for a target block nonce.
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+pub struct Block {
+    pub id: String,
+    pub height: u32,
+    pub nonce: u32,
+}
+
 pub fn sort_guesses_by_target_diff(guesses: &mut [Guess], target_nonce: u32) {
     guesses.sort_by(|a, b| {
         let target_a = target_nonce.abs_diff(a.nonce);

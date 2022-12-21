@@ -1,24 +1,17 @@
 use axum::body::{boxed, Full};
-use axum::extract::{Extension, Path, Query};
+use axum::extract::{Extension, Path};
 use axum::handler::Handler;
 use axum::http::{header, Uri};
 use axum::response::{IntoResponse, Response, Result};
 use axum::{http::StatusCode, routing::get, Json, Router};
 
 use axum::routing::{on, MethodFilter};
-use ng_model::serde_with::serde_as;
-use std::collections::{BTreeMap, HashMap};
 use std::net::SocketAddr;
-use std::ops::Add;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use tracing;
-
 use ng_model::*;
 
-use serde::{Deserialize, Serialize};
-use serde_json::json;
 use sqlx::{migrate, Pool, Sqlite};
 
 use sqlx::sqlite::SqlitePoolOptions;
@@ -65,12 +58,8 @@ async fn main() {
     let shared_state = Arc::new(State { pool });
 
     let api_routes = Router::new()
-        .route(
-            "/target",
-            get(get_current_target)
-                .post(post_target_block)
-                .put(put_target_nonce),
-        )
+        .route("/target", get(get_current_target).post(post_target_block))
+        .route("/target/nonce", get(get_target_nonce))
         .route("/guesses/:block", get(get_guesses))
         .route("/guesses", on(MethodFilter::POST, post_guess))
         .layer(Extension(shared_state));
@@ -164,15 +153,32 @@ async fn post_target_block(
     }
 }
 
-async fn put_target_nonce(
-    Extension(state): Extension<Arc<State>>,
-    nonce: String,
-) -> Result<(), Error> {
-    let nonce = u32::from_str(nonce.as_str()).map_err(|e| Error::Generic(e.to_string()))?;
+async fn get_target_nonce(Extension(state): Extension<Arc<State>>) -> Result<String, Error> {
+    //let nonce = u32::from_str(nonce.as_str()).map_err(|e| Error::Generic(e.to_string()))?;
+    let client = reqwest::Client::new();
     let mut tx = state.pool.begin().await?;
-    tx.set_current_nonce(nonce).await?;
-    tx.commit().await?;
-    Ok(())
+    let target = tx.select_current_target().await?;
+    if let Target { block, nonce: None } = target {
+        let block_height_response = client
+            .get(format!("https://mempool.space/api/block-height/{}", block))
+            .send()
+            .await?;
+        if block_height_response.status().is_success() {
+            let block_hash = block_height_response.text().await.map_err(Error::Reqwest)?;
+            let block_response = client
+                .get(format!("https://mempool.space/api/block/{}", block_hash))
+                .send()
+                .await?;
+            if block_response.status().is_success() {
+                let block: Block = block_response.json().await?;
+                let nonce = block.nonce;
+                tx.set_current_nonce(nonce).await?;
+                tx.commit().await?;
+                return Ok(nonce.to_string());
+            }
+        }
+    }
+    Ok(String::default())
 }
 
 async fn get_guesses(
@@ -190,7 +196,7 @@ async fn post_guess(
     Json(guess): Json<Guess>,
 ) -> Result<(), Error> {
     let mut tx = state.pool.begin().await?;
-    let guesses = tx.insert_guess(guess).await?;
+    tx.insert_guess(guess).await?;
     tx.commit().await?;
     Ok(())
 }

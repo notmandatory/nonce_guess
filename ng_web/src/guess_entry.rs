@@ -98,7 +98,7 @@ pub fn guess_entry(props: &GuessEntryProps) -> Html {
         })
     };
 
-    let block = props.block.clone();
+    let block = props.block;
     let onclick = {
         let state = state.clone();
         move |_: MouseEvent| {
@@ -112,9 +112,10 @@ pub fn guess_entry(props: &GuessEntryProps) -> Html {
                     });
                     state.dispatch(GuessEntryAction::Clear);
                 } else {
-                    state.dispatch(GuessEntryAction::SetNonceError(
-                        format!("Nonce '{}' is not valid hex.", &nonce).to_string(),
-                    ))
+                    state.dispatch(GuessEntryAction::SetNonceError(format!(
+                        "Nonce '{}' is not valid hex.",
+                        &nonce
+                    )))
                 }
             } else {
                 if state.name.is_none() {
