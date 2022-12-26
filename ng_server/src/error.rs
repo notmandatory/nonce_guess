@@ -1,16 +1,14 @@
+use std::num::ParseIntError;
 use crate::IntoResponse;
 use axum::http::StatusCode;
 use axum::response::Response;
 use axum::Json;
-use ng_model::serde_json;
 use ng_model::serde_json::json;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("database: {0}")]
     Db(sqlx::Error),
-    #[error("serde json: {0}")]
-    SerdeJson(serde_json::Error),
     #[error("generic: {0}")]
     Generic(String),
     #[error("reqwest: {0}")]
@@ -29,11 +27,14 @@ impl From<reqwest::Error> for Error {
     }
 }
 
+impl From<ParseIntError> for Error {
+    fn from (err: ParseIntError) -> Self { Error::Generic(err.to_string()) }
+}
+
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
             Error::Db(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-            Error::SerdeJson(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             Error::Generic(e) => (StatusCode::INTERNAL_SERVER_ERROR, e),
             Error::Reqwest(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };

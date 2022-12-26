@@ -131,16 +131,33 @@ async fn get_current_target(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Target>, Error> {
     let mut tx = state.pool.begin().await?;
-    let target = tx.select_current_target().await?;
-    tx.commit().await?;
-    Ok(Json(target))
+    if let Ok(target) = tx.select_current_target().await {
+        tx.commit().await?;
+        Ok(Json(target))
+    } else {
+        let client = reqwest::Client::new();
+        let block_tip_height_response = client
+            .get(format!("https://mempool.space/api/blocks/tip/height"))
+            .send()
+            .await?;
+            let block_tip_height = block_tip_height_response.text().await?;
+            let block_tip_height = u32::from_str(block_tip_height.as_str())?;
+            let block = block_tip_height + 1;
+            tx.insert_target(block).await?;
+            tx.commit().await?;
+            Ok(Json(Target {
+                block,
+                nonce: None
+            }))
+    }
+
 }
 
 async fn post_target_block(
     Extension(state): Extension<Arc<State>>,
     block: String,
 ) -> Result<(), Error> {
-    let new_block = u32::from_str(block.as_str()).map_err(|e| Error::Generic(e.to_string()))?;
+    let new_block = u32::from_str(block.as_str())?;
     let mut tx = state.pool.begin().await?;
     let current_nonce = tx.select_current_target().await?.nonce;
     if current_nonce.is_some() {
@@ -154,7 +171,7 @@ async fn post_target_block(
 }
 
 async fn get_target_nonce(Extension(state): Extension<Arc<State>>) -> Result<String, Error> {
-    //let nonce = u32::from_str(nonce.as_str()).map_err(|e| Error::Generic(e.to_string()))?;
+    //let nonce = u32::from_str(nonce.as_str())?;
     let client = reqwest::Client::new();
     let mut tx = state.pool.begin().await?;
     let target = tx.select_current_target().await?;
@@ -164,7 +181,7 @@ async fn get_target_nonce(Extension(state): Extension<Arc<State>>) -> Result<Str
             .send()
             .await?;
         if block_height_response.status().is_success() {
-            let block_hash = block_height_response.text().await.map_err(Error::Reqwest)?;
+            let block_hash = block_height_response.text().await?;
             let block_response = client
                 .get(format!("https://mempool.space/api/block/{}", block_hash))
                 .send()
