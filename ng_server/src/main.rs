@@ -195,7 +195,7 @@ async fn get_target_nonce(Extension(state): Extension<Arc<State>>) -> Result<Str
             }
         }
     }
-    Ok(String::default())
+    Ok(target.nonce.map(|n| n.to_string()).unwrap_or_default())
 }
 
 async fn get_guesses(

@@ -164,38 +164,7 @@ pub fn app() -> Html {
         })
     };
 
-    let onclick_update_guesses = {
-        let state = state.clone();
-        Callback::from(move |_| {
-            {
-                let state = state.clone();
-                if let Some(target) = state.target.clone() {
-                    wasm_bindgen_futures::spawn_local(async move {
-                        let get_guesses_result: Result<Vec<Guess>, _> = Request::get(format!("/api/guesses/{}", target.block).as_str())
-                            .send()
-                            .await
-                            .unwrap()
-                            .json()
-                            .await;
-                        if let Ok(mut guesses) = get_guesses_result {
-                            if !guesses.is_empty() {
-                                debug!("get_guesses_result: {:?}", guesses);
-                                if let Some(nonce) = target.nonce {
-                                    sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce);
-                                }
-                                state.dispatch(AppAction::SetGuesses(guesses));
-                            }
-                        } else {
-                            // TODO else display an error
-                            debug!("get guesses error: {:?}", get_guesses_result);
-                        }
-                    });
-                }
-            }
-        })
-    };
-
-    let onclick_update_nonce = {
+    let onclick_update = {
         let state = state.clone();
         Callback::from(move |_| {
             {
@@ -207,6 +176,7 @@ pub fn app() -> Html {
                         .unwrap()
                         .text()
                         .await;
+
                     debug!("get_nonce_result: {:?}", get_nonce_result);
                     if let Ok(nonce) = get_nonce_result {
                         //let nonce = get_nonce_result.unwrap();
@@ -222,6 +192,28 @@ pub fn app() -> Html {
                     } else {
                         // TODO else display an error
                         debug!("get nonce error: {:?}", get_nonce_result);
+                    }
+
+                    if let Some(target) = state.target.clone() {
+                        let get_guesses_result: Result<Vec<Guess>, _> = Request::get(format!("/api/guesses/{}", target.block).as_str())
+                            .send()
+                            .await
+                            .unwrap()
+                            .json()
+                            .await;
+
+                        if let Ok(mut guesses) = get_guesses_result {
+                            if !guesses.is_empty() {
+                                debug!("get_guesses_result: {:?}", guesses);
+                                if let Some(nonce) = target.nonce {
+                                    sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce);
+                                }
+                                state.dispatch(AppAction::SetGuesses(guesses));
+                            }
+                        } else {
+                            // TODO else display an error
+                            debug!("get guesses error: {:?}", get_guesses_result);
+                        }
                     }
                 });
             }
@@ -275,9 +267,6 @@ pub fn app() -> Html {
                                                 </tr>
                                             </tbody>
                                         </table>
-                                        <div class="control">
-                                            <button class = "button is-link" onclick={ onclick_update_nonce }>{"Update"}</button>
-                                        </div>
                                     </div>
                                 }
                             }
@@ -306,9 +295,9 @@ pub fn app() -> Html {
                                     }
                                     </tbody>
                                 </table>
-                                <div class="control">
-                                    <button class = "button is-link" onclick={ onclick_update_guesses }>{"Update"}</button>
-                                </div>
+                            </div>
+                            <div class="control">
+                                <button class = "button is-link" onclick={ onclick_update }>{"Update"}</button>
                             </div>
                         </div>
                     </div>
