@@ -164,6 +164,38 @@ pub fn app() -> Html {
         })
     };
 
+    let onclick_update_guesses = {
+        let state = state.clone();
+        Callback::from(move |_| {
+            {
+                let state = state.clone();
+                if let Some(target) = state.target.clone() {
+                    wasm_bindgen_futures::spawn_local(async move {
+                        let get_guesses_result: Result<Vec<Guess>, _> = Request::get(format!("/api/guesses/{}", target.block).as_str())
+                            .send()
+                            .await
+                            .unwrap()
+                            .json()
+                            .await;
+                        debug!("get_guesses_result: {:?}", get_guesses_result);
+                        if let Ok(mut guesses) = get_guesses_result {
+                            if !guesses.is_empty() {
+                                debug!("get_guesses_result: {:?}", guesses);
+                                if let Some(nonce) = target.nonce {
+                                    sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce);
+                                }
+                                state.dispatch(AppAction::SetGuesses(guesses));
+                            }
+                        } else {
+                            // TODO else display an error
+                            debug!("get guesses error: {:?}", get_guesses_result);
+                        }
+                    });
+                }
+            }
+        })
+    };
+
     let onclick_update_nonce = {
         let state = state.clone();
         Callback::from(move |_| {
@@ -266,6 +298,9 @@ pub fn app() -> Html {
                                     }
                                     </tbody>
                                 </table>
+                                <div class="control">
+                                    <button class = "button is-link" onclick={ onclick_update_guesses }>{"Update"}</button>
+                                </div>
                             </div>
                         </div>
                     </div>
