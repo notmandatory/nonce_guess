@@ -177,7 +177,6 @@ pub fn app() -> Html {
                             .unwrap()
                             .json()
                             .await;
-                        debug!("get_guesses_result: {:?}", get_guesses_result);
                         if let Ok(mut guesses) = get_guesses_result {
                             if !guesses.is_empty() {
                                 debug!("get_guesses_result: {:?}", guesses);
@@ -239,8 +238,17 @@ pub fn app() -> Html {
                     </span></h1>
                     <div class="columns">
                         <div class="column is-one-third">
-                            <GuessEntry block={ target.block } onaddguess={ on_add_guess }/>
-                            <BlockEntry onsetblock={ on_set_block } />
+                            {
+                                if target.nonce.is_some() {
+                                    html! {
+                                        <BlockEntry onsetblock={ on_set_block } />
+                                    }
+                                } else {
+                                    html! {
+                                        <GuessEntry block={ target.block } onaddguess={ on_add_guess }/>
+                                    }
+                                }
+                            }
                         </div>
                         <div class="column">
                             {
