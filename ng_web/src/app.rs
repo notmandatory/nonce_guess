@@ -228,6 +228,7 @@ pub fn app() -> Html {
                         <img src="/img/apple-touch-icon.png" width="75" height="75"/>
                         { "Guess the Block Nonce" }
                     </span></h1>
+                 <img src="/img/qr-code.svg" width="150" height="150"/>
                     <div class="columns">
                         <div class="column is-one-third">
                             {
