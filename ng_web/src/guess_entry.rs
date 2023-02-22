@@ -139,8 +139,8 @@ pub fn guess_entry(props: &GuessEntryProps) -> Html {
 
     html! {
         <div class="block">
-            <FieldEntry label={"Name"} value={name_value} placeholder={"eg. Steve"} error={name_error} onchange={onchange_name.clone()} />
-            <FieldEntry label={"Nonce Guess, Hex"} value={nonce_value} placeholder={"8 characters, use only 0-9 and A-F, eg. 2FC683D5"} error={nonce_error} onchange={onchange_nonce.clone()} />
+            <FieldEntry maxlength={"1000"} label={"Name"} value={name_value} placeholder={"eg. Steve"} error={name_error} onchange={onchange_name.clone()} />
+            <FieldEntry maxlength={"8"} label={"Nonce Guess, Hex"} value={nonce_value} placeholder={"8 characters, use only 0-9 and A-F, eg. 2FC683D5"} error={nonce_error} onchange={onchange_nonce.clone()} />
             <div class="control">
                 <button class = "button is-link" onclick={ onclick }>{"Add"}</button>
             </div>

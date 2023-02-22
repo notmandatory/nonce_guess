@@ -10,6 +10,7 @@ pub struct FieldEntryProps {
     pub placeholder: AttrValue,
     pub error: AttrValue,
     pub onchange: Callback<String>,
+    pub maxlength: AttrValue,
 }
 
 #[function_component(FieldEntry)]
@@ -51,6 +52,7 @@ pub fn field_entry(props: &FieldEntryProps) -> Html {
                     value={ props.value.clone() }
                     class="input"
                     placeholder={ props.placeholder.clone() }
+                    maxlength={ props.maxlength.clone() }
                     { onchange }
                 />
             </div>
