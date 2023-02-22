@@ -90,7 +90,7 @@ pub fn block_entry(props: &BlockEntryProps) -> Html {
 
     html! {
         <div class="block">
-            <FieldEntry label={"Target Block"} value={block_value} placeholder={"eg. 768159"} error={block_error} onchange={onchange_block.clone()} />
+            <FieldEntry maxlength={"1000"} label={"Target Block"} value={block_value} placeholder={"eg. 768159"} error={block_error} onchange={onchange_block.clone()} />
             <div class="control">
                 <button class = "button is-link" onclick={ onclick_block }>{"Set"}</button>
             </div>
