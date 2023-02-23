@@ -7,6 +7,7 @@ use axum::{http::StatusCode, routing::get, Json, Router};
 
 use axum::routing::{on, MethodFilter};
 use std::net::SocketAddr;
+use std::ops::Add;
 use std::str::FromStr;
 use std::sync::Arc;
 
@@ -22,6 +23,8 @@ use crate::error::Error;
 use crate::Error::Generic;
 use rust_embed::RustEmbed;
 
+use clap::Parser;
+
 mod db;
 mod error;
 
@@ -35,14 +38,33 @@ pub struct State {
     pub pool: Pool<Sqlite>,
 }
 
+/// Nonce Guess Server CLI arguments
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct CliArgs {
+    // /// Public URL of this server, if set will be displayed as a QR code
+    // #[arg(short, long, value_name = "NG_WEB_URL")]
+    // web_url: Option<String>,
+    #[arg(short, long, value_name = "NG_DB_URL")]
+    /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.db", defaults to in-memory DB
+    db_url: Option<String>,
+}
+
 #[tokio::main]
 async fn main() {
     // initialize tracing
     tracing_subscriber::fmt::init();
 
+    // Parse CLI arguments
+    let cli_args: CliArgs = CliArgs::parse();
+    dbg!(&cli_args);
+
     // get database URL from env
-    let database_url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "sqlite://nonce_guess.db?mode=rwc".to_string());
+    let database_url = cli_args
+        .db_url
+        .unwrap_or_else(|| ":memory:".to_string())
+        .add("?mode=rwc");
+    dbg!(&database_url);
 
     // setup connection pool
     let pool = SqlitePoolOptions::new()
@@ -140,17 +162,13 @@ async fn get_current_target(
             .get(format!("https://mempool.space/api/blocks/tip/height"))
             .send()
             .await?;
-            let block_tip_height = block_tip_height_response.text().await?;
-            let block_tip_height = u32::from_str(block_tip_height.as_str())?;
-            let block = block_tip_height + 1;
-            tx.insert_target(block).await?;
-            tx.commit().await?;
-            Ok(Json(Target {
-                block,
-                nonce: None
-            }))
+        let block_tip_height = block_tip_height_response.text().await?;
+        let block_tip_height = u32::from_str(block_tip_height.as_str())?;
+        let block = block_tip_height + 1;
+        tx.insert_target(block).await?;
+        tx.commit().await?;
+        Ok(Json(Target { block, nonce: None }))
     }
-
 }
 
 async fn post_target_block(

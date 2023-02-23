@@ -1,9 +1,9 @@
-use std::num::ParseIntError;
 use crate::IntoResponse;
 use axum::http::StatusCode;
 use axum::response::Response;
 use axum::Json;
 use ng_model::serde_json::json;
+use std::num::ParseIntError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -28,7 +28,9 @@ impl From<reqwest::Error> for Error {
 }
 
 impl From<ParseIntError> for Error {
-    fn from (err: ParseIntError) -> Self { Error::Generic(err.to_string()) }
+    fn from(err: ParseIntError) -> Self {
+        Error::Generic(err.to_string())
+    }
 }
 
 impl IntoResponse for Error {

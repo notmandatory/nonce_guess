@@ -9,6 +9,13 @@ use thousands::Separable;
 use yew::prelude::*;
 use yew::{function_component, Reducible};
 
+use base64::engine::general_purpose;
+use base64::Engine;
+use qrcode_generator::QrCodeEcc;
+use wasm_bindgen::UnwrapThrowExt;
+use web_sys::window;
+use web_sys::Document;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppState {
     pub target: Option<Target>,
@@ -140,6 +147,18 @@ pub fn app() -> Html {
         })
     };
 
+    let document_url: String = window()
+        .expect_throw("window is undefined")
+        .document()
+        .expect_throw("document is undefined")
+        .url()
+        .expect_throw("url is undefined");
+
+    let url_qr_png: Vec<u8> =
+        qrcode_generator::to_png_to_vec(document_url, QrCodeEcc::Low, 150).unwrap();
+    let url_qr_base64 = general_purpose::STANDARD.encode(&url_qr_png);
+    let url_qr_img_src = format!("data:image/png;base64,{}", url_qr_base64);
+
     let on_set_block = {
         let state = state.clone();
         Callback::from(move |block: u32| {
@@ -195,12 +214,13 @@ pub fn app() -> Html {
                     }
 
                     if let Some(target) = state.target.clone() {
-                        let get_guesses_result: Result<Vec<Guess>, _> = Request::get(format!("/api/guesses/{}", target.block).as_str())
-                            .send()
-                            .await
-                            .unwrap()
-                            .json()
-                            .await;
+                        let get_guesses_result: Result<Vec<Guess>, _> =
+                            Request::get(format!("/api/guesses/{}", target.block).as_str())
+                                .send()
+                                .await
+                                .unwrap()
+                                .json()
+                                .await;
 
                         if let Ok(mut guesses) = get_guesses_result {
                             if !guesses.is_empty() {
@@ -228,7 +248,7 @@ pub fn app() -> Html {
                         <img src="/img/apple-touch-icon.png" width="75" height="75"/>
                         { "Guess the Block Nonce" }
                     </span></h1>
-                 <img src="/img/qr-code.svg" width="150" height="150"/>
+                 <img src={ url_qr_img_src } alt="URL QR Code" height="150" />
                     <div class="columns">
                         <div class="column is-one-third">
                             {

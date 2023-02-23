@@ -1,3 +1,4 @@
+use web_sys::Document;
 use web_sys::HtmlInputElement;
 use yew::events::Event;
 use yew::prelude::*;
