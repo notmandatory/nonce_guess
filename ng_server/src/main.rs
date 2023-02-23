@@ -42,9 +42,9 @@ pub struct State {
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct CliArgs {
-    // /// Public URL of this server, if set will be displayed as a QR code
-    // #[arg(short, long, value_name = "NG_WEB_URL")]
-    // web_url: Option<String>,
+    /// Address this server should listen on, defaults to "127.0.0.1:8081"
+    #[arg(short, long, value_name = "HOST:PORT")]
+    listen_address: Option<String>,
     #[arg(short, long, value_name = "NG_DB_URL")]
     /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.db", defaults to in-memory DB
     db_url: Option<String>,
@@ -91,7 +91,11 @@ async fn main() {
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from(([127, 0, 0, 1], 8081));
+    let listen_address = cli_args
+        .listen_address
+        .unwrap_or_else(|| "127.0.0.1:8081".to_string());
+
+    let addr = SocketAddr::from_str(listen_address.as_str()).unwrap();
     info!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
