@@ -13,14 +13,14 @@ use std::sync::Arc;
 
 use ng_model::*;
 
-use sqlx::{migrate, Pool, Sqlite};
+use redb::{Database, Error as DbError};
 
-use sqlx::sqlite::SqlitePoolOptions;
 use tracing::info;
 
 use crate::db::Db;
 use crate::error::Error;
 use crate::Error::Generic;
+
 use rust_embed::RustEmbed;
 
 use clap::Parser;
@@ -35,19 +35,19 @@ struct Assets;
 static INDEX_HTML: &str = "index.html";
 
 pub struct State {
-    pub pool: Pool<Sqlite>,
+    pub db: Database,
 }
 
 /// Nonce Guess Server CLI arguments
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct CliArgs {
-    /// Address this server should listen on, defaults to "127.0.0.1:8081"
-    #[arg(short, long, value_name = "HOST:PORT")]
-    listen_address: Option<String>,
-    #[arg(short, long, value_name = "NG_DB_URL")]
-    /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.db", defaults to in-memory DB
-    db_url: Option<String>,
+    /// Address this server should listen on"
+    #[arg(short, long, value_name = "HOST:PORT", default_value = "127.0.0.1:8081")]
+    listen_address: String,
+    #[arg(short, long, value_name = "NG_DB_NAME", default_value = "nonce_guess.redb")]
+    /// redb database file name for this server"
+    db_name: String,
 }
 
 #[tokio::main]
@@ -58,24 +58,11 @@ async fn main() {
     // Parse CLI arguments
     let cli_args: CliArgs = CliArgs::parse();
 
-    // get database URL from env
-    let database_url = cli_args
-        .db_url
-        .unwrap_or_else(|| ":memory:".to_string())
-        .add("?mode=rwc");
+    // get database name from cli
+    let db_name = cli_args.db_name;
 
-    // setup connection pool
-    let pool = SqlitePoolOptions::new()
-        .connect(&database_url)
-        .await
-        .expect("can connect to database");
-
-    migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("migrated database");
-
-    let shared_state = Arc::new(State { pool });
+    let db = Database::create(db_name.as_str())?;
+    let shared_state = Arc::new(State { db });
 
     let api_routes = Router::new()
         .route("/target", get(get_current_target).post(post_target_block))
@@ -89,11 +76,8 @@ async fn main() {
         .nest("/api", api_routes)
         .fallback(static_handler.into_service());
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
-    let listen_address = cli_args
-        .listen_address
-        .unwrap_or_else(|| "127.0.0.1:8081".to_string());
+    // get listen address from cli
+    let listen_address = cli_args.listen_address;
 
     let addr = SocketAddr::from_str(listen_address.as_str()).unwrap();
     info!("listening on {}", addr);

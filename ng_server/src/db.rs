@@ -1,8 +1,12 @@
 use crate::error::Error;
 use axum::async_trait;
 use ng_model::{Guess, Target};
-use sqlx::sqlite::SqliteRow;
-use sqlx::{FromRow, Row, Sqlite, Transaction};
+
+use redb::{Database, Error as DbError, ReadableTable, TableDefinition};
+
+
+const TABLE: TableDefinition<&str, u64> = TableDefinition::new("my_data");
+
 
 #[async_trait]
 pub trait Db {

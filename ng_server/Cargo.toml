@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 ng_model = { path = "../ng_model" }
 log = "0.4"
-sqlx = { version = "0.5.10", features = ["runtime-tokio-rustls", "any", "sqlite", "migrate"] }
+redb = "0.13.0"
 thiserror = "1"
 axum = { version = "0.5" }
 axum-extra = { version = "0.3.7", features = ["spa"] }
