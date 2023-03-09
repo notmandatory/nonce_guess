@@ -13,7 +13,7 @@
    RUST_LOG=debug cargo run --bin ng_server
    ```
    
-The data is stored in SQLite files named `nonce_guess.db*`. 
+By default the data is stored in SQLite memory database. 
    
 ### Create Release Build
 

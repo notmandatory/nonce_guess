@@ -5,7 +5,7 @@ pub use serde_json;
 pub use serde_with;
 
 /// The target block that players are trying to guess the nonce for.
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
 pub struct Target {
     pub block: u32,
     pub nonce: Option<u32>,
@@ -14,12 +14,12 @@ pub struct Target {
 /// A players guess for a target block nonce.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct Guess {
-    pub block: u32,
+    pub block: Option<u32>,
     pub name: String,
     pub nonce: u32,
 }
 
-/// A players guess for a target block nonce.
+/// Block data from mempool.space.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct Block {
     pub id: String,

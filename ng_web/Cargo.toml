@@ -6,6 +6,7 @@ license = "MIT"
 
 [dependencies]
 yew = { version = "0.20.0", features = ["csr"] }
+yew-router = { version = "0.17" }
 web-sys = { version = "0.3", features = ["HtmlElement", "HtmlInputElement", "Node", "Document"] }
 thousands = "0.2.0"
 ng_model = { path = "../ng_model" }

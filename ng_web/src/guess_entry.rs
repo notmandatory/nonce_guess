@@ -67,7 +67,6 @@ impl Reducible for GuessEntryState {
 
 #[derive(Properties, PartialEq)]
 pub struct GuessEntryProps {
-    pub block: Option<u32>,
     pub onaddguess: Callback<Guess>,
 }
 
@@ -98,15 +97,14 @@ pub fn guess_entry(props: &GuessEntryProps) -> Html {
         })
     };
 
-    let block = props.block;
     let onclick = {
         let state = state.clone();
         move |_: MouseEvent| {
-            if state.name.is_some() && state.nonce.is_some() && block.is_some() {
+            if state.name.is_some() && state.nonce.is_some() {
                 let nonce = state.nonce.clone().unwrap();
                 if let Ok(decimal_nonce) = u32::from_str_radix(nonce.as_str(), 16) {
                     onaddguess.emit(Guess {
-                        block: block.unwrap(),
+                        block: None,
                         name: state.name.clone().unwrap(),
                         nonce: decimal_nonce,
                     });

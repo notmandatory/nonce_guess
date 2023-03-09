@@ -19,7 +19,13 @@ pub trait Db {
     async fn insert_guess(&mut self, guess: Guess) -> Result<(), Error>;
 
     /// Select guesses for target block
-    async fn select_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error>;
+    async fn select_block_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error>;
+
+    /// Select guesses with no found target block
+    async fn select_guesses(&mut self) -> Result<Vec<Guess>, Error>;
+
+    /// Set block for guesses without a set block
+    async fn set_guesses_block(&mut self, block: u32) -> Result<(), Error>;
 }
 
 #[async_trait]
@@ -68,7 +74,7 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .map_err(|err| err.into())
     }
 
-    async fn select_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error> {
+    async fn select_block_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error> {
         let query = sqlx::query_as::<Sqlite, GuessRow>(
             "SELECT * FROM guess WHERE block IS ? ORDER BY nonce",
         )
@@ -78,6 +84,26 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .await
             .map_err(|err| err.into())
             .map(|gv| gv.into_iter().map(|gr| gr.0).collect())
+    }
+
+    async fn select_guesses(&mut self) -> Result<Vec<Guess>, Error> {
+        let query = sqlx::query_as::<Sqlite, GuessRow>(
+            "SELECT * FROM guess WHERE block IS null ORDER BY nonce",
+        );
+        query
+            .fetch_all(self)
+            .await
+            .map_err(|err| err.into())
+            .map(|gv| gv.into_iter().map(|gr| gr.0).collect())
+    }
+
+    async fn set_guesses_block(&mut self, block: u32) -> Result<(), Error> {
+        let query = sqlx::query("UPDATE guess set block = ? WHERE block IS null").bind(block);
+        query
+            .execute(&mut *self)
+            .await
+            .map(|_| ())
+            .map_err(|err| err.into())
     }
 }
 
@@ -96,7 +122,7 @@ struct GuessRow(Guess);
 impl FromRow<'_, SqliteRow> for GuessRow {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
         let player_name = row.get::<String, usize>(0);
-        let block = row.get::<u32, usize>(1);
+        let block = row.get::<Option<u32>, usize>(1);
         let nonce = row.get::<u32, usize>(2);
         Ok(GuessRow(Guess {
             name: player_name,

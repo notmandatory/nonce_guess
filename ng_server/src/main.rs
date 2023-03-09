@@ -20,7 +20,6 @@ use tracing::info;
 
 use crate::db::Db;
 use crate::error::Error;
-use crate::Error::Generic;
 use rust_embed::RustEmbed;
 
 use clap::Parser;
@@ -47,7 +46,7 @@ struct CliArgs {
     listen_address: Option<String>,
     #[arg(short, long, value_name = "NG_DB_URL")]
     /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.db", defaults to in-memory DB
-    db_url: Option<String>,
+    database_url: Option<String>,
 }
 
 #[tokio::main]
@@ -60,7 +59,7 @@ async fn main() {
 
     // get database URL from env
     let database_url = cli_args
-        .db_url
+        .database_url
         .unwrap_or_else(|| ":memory:".to_string())
         .add("?mode=rwc");
 
@@ -80,8 +79,9 @@ async fn main() {
     let api_routes = Router::new()
         .route("/target", get(get_current_target).post(post_target_block))
         .route("/target/nonce", get(get_target_nonce))
-        .route("/guesses/:block", get(get_guesses))
+        .route("/guesses", get(get_guesses))
         .route("/guesses", on(MethodFilter::POST, post_guess))
+        .route("/guesses/:block", get(get_block_guesses))
         .layer(Extension(shared_state));
 
     // build our application with a route
@@ -159,17 +159,8 @@ async fn get_current_target(
         tx.commit().await?;
         Ok(Json(target))
     } else {
-        let client = reqwest::Client::new();
-        let block_tip_height_response = client
-            .get(format!("https://mempool.space/api/blocks/tip/height"))
-            .send()
-            .await?;
-        let block_tip_height = block_tip_height_response.text().await?;
-        let block_tip_height = u32::from_str(block_tip_height.as_str())?;
-        let block = block_tip_height + 1;
-        tx.insert_target(block).await?;
         tx.commit().await?;
-        Ok(Json(Target { block, nonce: None }))
+        Err(Error::Generic("No target block is set.".to_string()))
     }
 }
 
@@ -177,16 +168,17 @@ async fn post_target_block(
     Extension(state): Extension<Arc<State>>,
     block: String,
 ) -> Result<(), Error> {
-    let new_block = u32::from_str(block.as_str())?;
+    let new_target = u32::from_str(block.as_str())?;
     let mut tx = state.pool.begin().await?;
-    let current_nonce = tx.select_current_target().await?.nonce;
-    if current_nonce.is_some() {
-        tx.insert_target(new_block).await?;
+    let current_target = tx.select_current_target().await.unwrap_or_default();
+    if current_target.block < new_target {
+        tx.insert_target(new_target).await?;
         tx.commit().await?;
         Ok(())
     } else {
-        tx.rollback().await?;
-        Err(Generic("Current target nonce is not set.".to_string()))
+        Err(Error::Generic(
+            "New target block must be greater than current target.".to_string(),
+        ))
     }
 }
 
@@ -194,36 +186,45 @@ async fn get_target_nonce(Extension(state): Extension<Arc<State>>) -> Result<Str
     //let nonce = u32::from_str(nonce.as_str())?;
     let client = reqwest::Client::new();
     let mut tx = state.pool.begin().await?;
-    let target = tx.select_current_target().await?;
-    if let Target { block, nonce: None } = target {
-        let block_height_response = client
-            .get(format!("https://mempool.space/api/block-height/{}", block))
+    let current_target = tx.select_current_target().await?;
+    let block_height_response = client
+        .get(format!(
+            "https://mempool.space/api/block-height/{}",
+            current_target.block
+        ))
+        .send()
+        .await?;
+    if block_height_response.status().is_success() {
+        let block_hash = block_height_response.text().await?;
+        let block_response = client
+            .get(format!("https://mempool.space/api/block/{}", block_hash))
             .send()
             .await?;
-        if block_height_response.status().is_success() {
-            let block_hash = block_height_response.text().await?;
-            let block_response = client
-                .get(format!("https://mempool.space/api/block/{}", block_hash))
-                .send()
-                .await?;
-            if block_response.status().is_success() {
-                let block: Block = block_response.json().await?;
-                let nonce = block.nonce;
-                tx.set_current_nonce(nonce).await?;
-                tx.commit().await?;
-                return Ok(nonce.to_string());
-            }
+        if block_response.status().is_success() {
+            let block: Block = block_response.json().await?;
+            let nonce = block.nonce;
+            tx.set_current_nonce(nonce).await?;
+            tx.set_guesses_block(block.height).await?;
+            tx.commit().await?;
+            return Ok(nonce.to_string());
         }
     }
-    Ok(target.nonce.map(|n| n.to_string()).unwrap_or_default())
+    Ok(String::default())
 }
 
-async fn get_guesses(
+async fn get_guesses(Extension(state): Extension<Arc<State>>) -> Result<Json<Vec<Guess>>, Error> {
+    let mut tx = state.pool.begin().await?;
+    let guesses = tx.select_guesses().await.unwrap_or_default();
+    tx.commit().await?;
+    Ok(Json(guesses))
+}
+
+async fn get_block_guesses(
     Extension(state): Extension<Arc<State>>,
     Path(block): Path<u32>,
 ) -> Result<Json<Vec<Guess>>, Error> {
     let mut tx = state.pool.begin().await?;
-    let guesses = tx.select_guesses(block).await?;
+    let guesses = tx.select_block_guesses(block).await?;
     tx.commit().await?;
     Ok(Json(guesses))
 }
