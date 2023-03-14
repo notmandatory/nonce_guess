@@ -1,0 +1,20 @@
+FROM rust:1.67 as builder
+
+WORKDIR /usr/src/nonce_guess
+COPY . .
+
+RUN rustup target add wasm32-unknown-unknown && cargo install trunk
+RUN trunk build --release ng_web/index.html && cargo build --bin ng_server --release
+
+FROM debian:11
+
+WORKDIR /root
+
+RUN apt update && apt upgrade -y
+RUN apt install -y git build-essential openssl librust-openssl-dev software-properties-common
+
+COPY --from=builder /usr/src/nonce_guess/target/release/ng_server .
+EXPOSE 8081
+
+ENV RUST_LOG=debug
+CMD ["./ng_server","-l","0.0.0.0:8081"]

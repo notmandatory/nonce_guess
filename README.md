@@ -31,3 +31,9 @@ By default the data is stored in SQLite memory database.
 To run the resulting self contained binary use `RUST_LOG=debug target/release/ng_server`.
 
 In test or release mode the web client can be found at: http://127.0.0.1:8081/
+
+### Build Docker Container
+
+1. `docker build -t nonce_guess .`
+2. `docker run --rm -it -p 8081:8081 --name nonce_guess_app nonce_guess`
+3. Visit http://127.0.0.1:8081/ in a browser
