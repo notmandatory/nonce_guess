@@ -16,5 +16,7 @@ RUN apt install -y git build-essential openssl librust-openssl-dev software-prop
 COPY --from=builder /usr/src/nonce_guess/target/release/ng_server .
 EXPOSE 8081
 
+VOLUME /data
+
 ENV RUST_LOG=debug
-CMD ["./ng_server","-l","0.0.0.0:8081"]
+CMD ["./ng_server","-l","0.0.0.0:8081", "-d", "/data/nonce_guess.db"]
