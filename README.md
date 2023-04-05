@@ -35,6 +35,8 @@ In test or release mode the web client can be found at: http://127.0.0.1:8081/
 ### Build Docker Container
 
 1. `docker build -t nonce_guess .`
-2. `mkdir -p docker/nonce_guess`
-3. ``docker run --rm -it -p 8081:8081 -v testvol:/data --name nonce_guess_app nonce_guess``
-4. Visit http://127.0.0.1:8081/ in a browser
+2. `docker run -d --rm -it -p 8081:8081 -v nonce_vol:/data --name nonce_guess_app nonce_guess`
+3. Visit http://127.0.0.1:8081/ in a browser
+
+Note: above steps also work with `podman` instead of `docker`.
+
