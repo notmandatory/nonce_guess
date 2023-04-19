@@ -81,6 +81,7 @@ async fn main() {
         .route("/target/nonce", get(get_target_nonce))
         .route("/guesses", get(get_guesses))
         .route("/guesses", on(MethodFilter::POST, post_guess))
+        .route("/guesses/odds", get(get_guess_probabalities))
         .route("/guesses/:block", get(get_block_guesses))
         .layer(Extension(shared_state));
 
@@ -151,6 +152,7 @@ async fn not_found() -> Response {
         .unwrap()
 }
 
+/// The target block that players are trying to guess the nonce for.
 async fn get_current_target(
     Extension(state): Extension<Arc<State>>,
 ) -> Result<Json<Target>, Error> {
@@ -210,6 +212,13 @@ async fn get_target_nonce(Extension(state): Extension<Arc<State>>) -> Result<Str
         }
     }
     Ok(String::default())
+}
+
+async fn get_guess_probabalities(Extension(state): Extension<Arc<State>>) -> Result<Json<Vec<(String, f32)>>, Error> {
+    let mut tx = state.pool.begin().await?;
+    let mut guesses = tx.select_guesses().await.unwrap_or_default();
+    tx.commit().await?;
+    Ok(Json(ng_model::get_guess_probabilities(guesses.as_mut_slice())))
 }
 
 async fn get_guesses(Extension(state): Extension<Arc<State>>) -> Result<Json<Vec<Guess>>, Error> {
