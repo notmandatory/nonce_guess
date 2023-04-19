@@ -246,9 +246,9 @@ fn home() -> Html {
                             .json()
                             .await
                             .unwrap();
-                    let is_dupe: Result<_, _> =
+                    let is_not_dupe: Result<_, _> =
                         no_duplicate_guess(fetched_guesses.as_mut_slice(), &guess);
-                    match is_dupe {
+                    match is_not_dupe {
                         Ok(s) => info!("Guess does not exist: {:?}", s),
                         Err(e) => {
                             let err_msg = format!("You cannot submit multiple guesses {:?}", e);
