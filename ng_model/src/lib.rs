@@ -38,3 +38,17 @@ pub fn sort_guesses_by_target_diff(guesses: &mut [Guess], target_nonce: u32) {
 pub fn sort_guesses_by_nonce(guesses: &mut [Guess]) {
     guesses.sort_by_key(|g| g.nonce)
 }
+
+pub fn check_for_duplicate_guess(
+    fetched_guesses: &mut [Guess],
+    new_guess: &Guess,
+) -> Result<bool, Guess> {
+    for fetched_guess in fetched_guesses.iter() {
+        if (fetched_guess.block.is_none() || fetched_guess.block == new_guess.block)
+            && fetched_guess.name == new_guess.name
+        {
+            return Err(fetched_guess.clone());
+        }
+    }
+    return Ok(true);
+}
