@@ -2,7 +2,7 @@ use crate::block_entry::BlockEntry;
 use crate::guess_entry::GuessEntry;
 use gloo_net::http::Request;
 use log::{debug, info};
-use ng_model::{check_for_duplicate_guess, sort_guesses_by_target_diff, Guess, Target};
+use ng_model::{no_duplicate_guess, sort_guesses_by_target_diff, Guess, Target};
 use std::rc::Rc;
 use std::str::FromStr;
 use thousands::Separable;
@@ -29,7 +29,6 @@ enum Route {
 
 #[function_component(Secure)]
 fn secure() -> Html {
-
     let state = use_reducer(|| AppState {
         target: None,
         guesses: None,
@@ -59,7 +58,7 @@ fn secure() -> Html {
             }
         })
     };
-    
+
     html! {
         <div class="section">
             <div class="container">
@@ -248,7 +247,7 @@ fn home() -> Html {
                             .await
                             .unwrap();
                     let is_dupe: Result<_, _> =
-                        check_for_duplicate_guess(fetched_guesses.as_mut_slice(), &guess);
+                        no_duplicate_guess(fetched_guesses.as_mut_slice(), &guess);
                     match is_dupe {
                         Ok(s) => info!("Guess does not exist: {:?}", s),
                         Err(e) => {

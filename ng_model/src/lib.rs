@@ -39,7 +39,7 @@ pub fn sort_guesses_by_nonce(guesses: &mut [Guess]) {
     guesses.sort_by_key(|g| g.nonce)
 }
 
-pub fn check_for_duplicate_guess(
+pub fn no_duplicate_guess(
     fetched_guesses: &mut [Guess],
     new_guess: &Guess,
 ) -> Result<bool, Guess> {
