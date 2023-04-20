@@ -16,7 +16,7 @@ pub struct Target {
 }
 
 /// A players guess for a target block nonce.
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq,)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 pub struct Guess {
     pub block: Option<u32>,
     pub name: String,
@@ -101,7 +101,6 @@ mod tests {
         ];
         let output = get_guess_probabilities(input.as_mut_slice());
         
-        dbg!(&output);
         assert_eq!(output[0], (String::from("carol"), 0.80784315));
         assert_eq!(output[1], (String::from("ben"), 0.19215687));
     }
