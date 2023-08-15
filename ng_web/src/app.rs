@@ -59,7 +59,64 @@ fn secure() -> Html {
             }
         })
     };
-    
+
+    let onclick_update = {
+        let state = state.clone();
+        Callback::from(move |_| {
+            {
+                let state = state.clone();
+                wasm_bindgen_futures::spawn_local(async move {
+                    let get_nonce_result = Request::get("/api/target/nonce")
+                        .send()
+                        .await
+                        .unwrap()
+                        .text()
+                        .await;
+
+                    debug!("get_nonce_result: {:?}", get_nonce_result);
+                    if let Ok(nonce) = get_nonce_result {
+                        //let nonce = get_nonce_result.unwrap();
+                        if !nonce.is_empty() {
+                            let nonce = u32::from_str(nonce.as_str()).unwrap();
+                            debug!("get_nonce_result: {}", nonce);
+                            state.dispatch(AppAction::SetNonce(nonce));
+                            if let Some(mut guesses) = state.guesses.clone() {
+                                sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce);
+                                state.dispatch(AppAction::SetGuesses(guesses));
+                            }
+                        }
+                    } else {
+                        // TODO else display an error
+                        debug!("get nonce error: {:?}", get_nonce_result);
+                    }
+
+                    if let Some(target) = state.target.clone() {
+                        let get_guesses_result: Result<Vec<Guess>, _> =
+                            Request::get(format!("/api/guesses").as_str())
+                                .send()
+                                .await
+                                .unwrap()
+                                .json()
+                                .await;
+
+                        if let Ok(mut guesses) = get_guesses_result {
+                            if !guesses.is_empty() {
+                                debug!("get_guesses_result: {:?}", guesses);
+                                if let Some(nonce) = target.nonce {
+                                    sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce);
+                                }
+                                state.dispatch(AppAction::SetGuesses(guesses));
+                            }
+                        } else {
+                            // TODO else display an error
+                            debug!("get guesses error: {:?}", get_guesses_result);
+                        }
+                    }
+                });
+            }
+        })
+    };
+
     html! {
         <div class="section">
             <div class="container">
@@ -71,6 +128,9 @@ fn secure() -> Html {
             </div>
             <div class="column">
                 <BlockEntry onsetblock={ on_set_block } />
+            </div>
+            <div class="control">
+                <button class = "button is-link" onclick={ onclick_update }>{"Update"}</button>
             </div>
         </div>
     }
@@ -286,63 +346,6 @@ fn home() -> Html {
     let url_qr_base64 = general_purpose::STANDARD.encode(&url_qr_png);
     let url_qr_img_src = format!("data:image/png;base64,{}", url_qr_base64);
 
-    let onclick_update = {
-        let state = state.clone();
-        Callback::from(move |_| {
-            {
-                let state = state.clone();
-                wasm_bindgen_futures::spawn_local(async move {
-                    let get_nonce_result = Request::get("/api/target/nonce")
-                        .send()
-                        .await
-                        .unwrap()
-                        .text()
-                        .await;
-
-                    debug!("get_nonce_result: {:?}", get_nonce_result);
-                    if let Ok(nonce) = get_nonce_result {
-                        //let nonce = get_nonce_result.unwrap();
-                        if !nonce.is_empty() {
-                            let nonce = u32::from_str(nonce.as_str()).unwrap();
-                            debug!("get_nonce_result: {}", nonce);
-                            state.dispatch(AppAction::SetNonce(nonce));
-                            if let Some(mut guesses) = state.guesses.clone() {
-                                sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce);
-                                state.dispatch(AppAction::SetGuesses(guesses));
-                            }
-                        }
-                    } else {
-                        // TODO else display an error
-                        debug!("get nonce error: {:?}", get_nonce_result);
-                    }
-
-                    if let Some(target) = state.target.clone() {
-                        let get_guesses_result: Result<Vec<Guess>, _> =
-                            Request::get(format!("/api/guesses").as_str())
-                                .send()
-                                .await
-                                .unwrap()
-                                .json()
-                                .await;
-
-                        if let Ok(mut guesses) = get_guesses_result {
-                            if !guesses.is_empty() {
-                                debug!("get_guesses_result: {:?}", guesses);
-                                if let Some(nonce) = target.nonce {
-                                    sort_guesses_by_target_diff(guesses.as_mut_slice(), nonce);
-                                }
-                                state.dispatch(AppAction::SetGuesses(guesses));
-                            }
-                        } else {
-                            // TODO else display an error
-                            debug!("get guesses error: {:?}", get_guesses_result);
-                        }
-                    }
-                });
-            }
-        })
-    };
-
     html! {
         <div class="section">
             <div class="container">
@@ -355,9 +358,8 @@ fn home() -> Html {
              <img src={ url_qr_img_src } alt="URL QR Code" height="150" />
                 <div class="columns">
                     <div class="column is-one-third">
-                            <GuessEntry onaddguess={ on_add_guess }/>
-                    </div>
-                    <div class="column">
+                        <GuessEntry onaddguess={ on_add_guess }/>
+
                         if let Some(target) = target {
                                 <div class="block">
                                     <div class="title is-4">{ "Target" }</div>
@@ -408,9 +410,6 @@ fn home() -> Html {
                                 }
                                 </tbody>
                             </table>
-                        </div>
-                        <div class="control">
-                            <button class = "button is-link" onclick={ onclick_update }>{"Update"}</button>
                         </div>
                     </div>
                 </div>
