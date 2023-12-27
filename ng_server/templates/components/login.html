@@ -1,0 +1,41 @@
+<div class="antialiased text-gray-900 px-6">
+    <div class="max-w-xl mx-auto py-12 divide-y md:max-w-4xl">
+        <div class="py-8">
+            <h1 class="text-4xl font-bold">
+                <img src="/assets/apple-touch-icon.png" width="75" height="75"/>
+                <br/>Login
+            </h1>
+            <p class="mt-2 text-lg text-gray-600">
+                Login with your <a href="https://fidoalliance.org/passkeys/" target="_blank" rel="noopener noreferrer">Passkey</a>
+                enabled browser by entering your name and clicking the login button. Or register a new name by clicking the
+                register button.
+            </p>
+            <div class="py-12">
+                    <div class="grid grid-cols-1 gap-6">
+                        <label class="block">
+                            <span class="text-gray-700">Name</span>
+                            <input
+                                    name="username"
+                                    id="username"
+                                    type="text"
+                                    class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                                    placeholder="eg. Hal"
+                            />
+                        </label>
+                    </div>
+                    <div class="mt-8 gap-6">
+                        <button type="submit" onclick="register()"
+                                class="rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                            Register
+                        </button>
+                        <button type="submit" onclick="login()"
+                                class="rounded-md bg-indigo-600 px-2.5 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                            Login
+                        </button>
+                    </div>
+                    <div>
+                        <p id="flash_message"></p>
+                    </div>
+            </div>
+    </div>
+</div>

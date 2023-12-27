@@ -1,4 +1,4 @@
-
 [workspace]
+resolver = "2"
 
-members = ["ng_model", "ng_server", "ng_web" ]
+members = ["ng_server"]

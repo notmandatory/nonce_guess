@@ -2,29 +2,17 @@ use crate::IntoResponse;
 use axum::http::StatusCode;
 use axum::response::Response;
 use axum::Json;
-use ng_model::serde_json::json;
+use serde_json::json;
 use std::num::ParseIntError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("database: {0}")]
-    Db(sqlx::Error),
+    Db(#[from] sqlx::Error),
     #[error("generic: {0}")]
     Generic(String),
     #[error("reqwest: {0}")]
-    Reqwest(reqwest::Error),
-}
-
-impl From<sqlx::Error> for Error {
-    fn from(err: sqlx::Error) -> Self {
-        Error::Db(err)
-    }
-}
-
-impl From<reqwest::Error> for Error {
-    fn from(err: reqwest::Error) -> Self {
-        Error::Reqwest(err)
-    }
+    Reqwest(#[from] reqwest::Error),
 }
 
 impl From<ParseIntError> for Error {
@@ -46,5 +34,33 @@ impl IntoResponse for Error {
         }));
 
         (status, body).into_response()
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum WebauthnError {
+    #[error("unknown webauthn error")]
+    Unknown,
+    #[error("Corrupt Session")]
+    CorruptSession,
+    #[error("User Not Found")]
+    UserNotFound,
+    #[error("User Has No Credentials")]
+    UserHasNoCredentials,
+    #[error("Deserialising Session failed: {0}")]
+    InvalidSessionState(#[from] tower_sessions::session::Error),
+}
+impl IntoResponse for WebauthnError {
+    fn into_response(self) -> Response {
+        let body = match self {
+            WebauthnError::CorruptSession => "Corrupt Session",
+            WebauthnError::UserNotFound => "User Not Found",
+            WebauthnError::Unknown => "Unknown Error",
+            WebauthnError::UserHasNoCredentials => "User Has No Credentials",
+            WebauthnError::InvalidSessionState(_) => "Deserialising Session failed",
+        };
+
+        // its often easiest to implement `IntoResponse` by calling other implementations
+        (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
     }
 }

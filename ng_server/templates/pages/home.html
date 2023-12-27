@@ -1,0 +1,13 @@
+<!-- prettier-ignore -->
+{% extends "layouts/base.html" %}
+
+{% block title %}Nonce Guess{% endblock %}
+
+{% block content %}
+
+  {% if uuid.is_none() %}
+    {% include "components/login.html" %}
+  {% else %}
+    {% include "components/guess.html" %}
+  {% endif %}
+{% endblock %}
