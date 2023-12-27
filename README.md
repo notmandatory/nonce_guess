@@ -7,28 +7,28 @@
 
 ### Local Testing
 
-1. Start the wasm web client builder in watch mode
+Install:
+
+pnpm
+cargo-watch
+
+From ng_server directory:
+
+1. Create tailwind css file and watch for changes
    ```shell
-   cd ng_web
-   trunk watch
+   pnpm dlx tailwindcss -i ./styles/tailwind.css -o ./assets/main.css --watch
    ```
 
 2. Start the api server, it will also serve the latest web client
    ```shell
-   RUST_LOG=debug cargo run --bin ng_server
+   RUST_LOG=debug cargo watch -- cargo run --bin ng_server
    ```
    
 By default the data is stored in SQLite memory database. 
    
 ### Create Release Build
 
-1. Build the web client artifacts
-   ```shell
-   cd ng_web
-   trunk build --release
-   ```
-
-2. Build the api server binary, this will include the web artifacts
+1. Build the api server binary, this will include the web artifacts
    ```shell
    cargo build --bin ng_server --release
    ```

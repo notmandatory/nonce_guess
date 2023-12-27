@@ -6,18 +6,27 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ng_model = { path = "../ng_model" }
-log = "0.4"
-sqlx = { version = "0.5.10", features = ["runtime-tokio-rustls", "any", "sqlite", "migrate"] }
-thiserror = "1"
-axum = { version = "0.5" }
-axum-extra = { version = "0.3.7", features = ["spa"] }
-reqwest = { version = "0.11", features = ["json"] }
-tokio = { version = "1.21", features = ["full"] }
-tower = { version = "0.4", features = ["full"] }
-tower-http = { version = "0.3", features = ["fs", "trace"] }
-rust-embed = { version = "6.4" }
+anyhow = "1"
+askama = "0.12"
+axum = { version = "0.6.20", features = ["http2"] }
+axum-extra = { version = "0.8.0", features = [] }
+axum_session = {version = "0.10.1", default-features = false}
+ciborium = { version = "0.2" }
+clap = { version = "4.1.6", features = ["derive"] }
+log = "0.4.20"
 mime_guess = { version = "2" }
+reqwest = { version = "0.11", features = ["json"] }
+rust-embed = { version = "8.0.0" }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1.0"
+serde_with = "2.3.3"
+sqlx = { version = "0.7.2", features = ["runtime-tokio", "any", "sqlite", "migrate"] }
+thiserror = "1"
+tokio = { version = "1.21", features = ["full"] }
+tower = { version = "0.4.13", features = ["full"] }
+tower-cookies = "0.9.0"
+tower-http = { version = "0.4.4", features = ["fs", "trace"] }
+tower-sessions = {  version = "0.6", features = ["sqlite-store"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-clap = { version = "4.1.6", features = ["derive"] }
+webauthn-rs = { version = "0.4", features = ["danger-allow-state-serialisation"] }

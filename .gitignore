@@ -1,5 +1,7 @@
 target/
 dist/
+/ng_server/node_modules
+/ng_server/assets/main.css
 *.db
 *shm
 *wal
