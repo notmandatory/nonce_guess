@@ -1,4 +1,4 @@
-FROM docker.io/library/rust:1.67 as builder
+FROM docker.io/library/rust:1.75 as builder
 
 WORKDIR /usr/src/nonce_guess
 COPY . .
