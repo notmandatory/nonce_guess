@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link href="../assets/main.css" rel="stylesheet"/>
+    <link href="https://rsms.me/inter/inter.css" rel="stylesheet"/>
+    <link
+            rel="apple-touch-icon"
+            sizes="180x180"
+            href="../assets/apple-touch-icon.png"
+    />
+    <link
+            rel="icon"
+            type="image/png"
+            sizes="32x32"
+            href="../assets/favicon-32x32.png"
+    />
+    <link
+            rel="icon"
+            type="image/png"
+            sizes="16x16"
+            href="../assets/favicon-16x16.png"
+    />
+    <link rel="manifest" href="../assets/site.webmanifest"/>
+    <title>Nonce Guess</title>
+    <script
+            src="https://unpkg.com/htmx.org@1.9.6"
+            integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni"
+            crossorigin="anonymous"
+    ></script>
+    <script src="https://unpkg.com/htmx.org/dist/ext/response-targets.js"></script>
+    <script
+            src="https://cdn.jsdelivr.net/npm/js-base64@3.7.4/base64.min.js"
+            integrity="sha384-VkKbwLiG7C18stSGuvcw9W0BHk45Ba7P9LJG5c01Yo4BI6qhFoWSa9TQLNA6EOzI"
+            crossorigin="anonymous">
+    </script>
+    <script src="/assets/auth.js" async></script>
+</head>
+
+<body>
+
+<div class="antialiased text-gray-900 px-6">
+    <div class="max-w-xl mx-auto py-12 md:max-w-4xl">
+        <div class="py-6">
+            <h1 class="text-4xl font-bold">
+                <img src="../assets/apple-touch-icon.png" width="75" height="75"/>
+                <br/>Guess the Block Nonce
+            </h1>
+
+            <div class="max-w-xl mx-auto py-12 divide-y md:max-w-4xl">
+                <div class="sm:flex sm:items-center">
+                    <div class="sm:flex-auto">
+                        <h2 class="text-lg font-semibold leading-6 text-gray-900">Target</h2>
+                    </div>
+                </div>
+
+                <div class="mt-8 flow-root">
+                    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                        <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                                <table class="min-w-full divide-y divide-gray-300">
+                                    <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col"
+                                            class="py-3.5 pl-4 pr-3 text-left text-base font-semibold text-gray-900 sm:pl-6">
+                                            Block
+                                        </th>
+                                        <th scope="col"
+                                            class="px-3 py-3.5 text-left text-base font-semibold text-gray-900">
+                                            Hex
+                                        </th>
+                                        <th scope="col"
+                                            class="px-3 py-3.5 text-left text-base font-semibold text-gray-900">
+                                            Decimal
+                                        </th>
+                                    </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200 bg-white">
+                                    <tr>
+                                        <td class="whitespace-nowrap py-4 pl-4 pr-3 font-mono text-base font-medium text-gray-900 sm:pl-6">
+                                            842,513
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 font-mono text-base text-gray-500">
+                                            FEEDBEEF
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-4 font-mono text-base text-gray-500">
+                                            1,233,445,564
+                                        </td>
+                                    </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="py-6">
+            <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <div class="sm:flex sm:items-start sm:justify-between">
+                        <div>
+                            <div class="mt-2 max-xl text-base text-gray-500">
+                                <p>Enter your nonce guess below. Your guess must be 8 hexadecimal characters which
+                                    are a-f, A-F and 0-9.
+                                    For example: "ab03f23e", "f2345c9d", etc. Every nonce in hex has a corresponding
+                                    decimal
+                                    representation, the guess that is closest numerically to the actual block nonce
+                                    is the winner.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white shadow-lg sm:rounded-lg">
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="sm:flex sm:items-start sm:justify-between">
+                            <form novalidate class="group">
+                                <h2 class="text-base font-bold text-gray-900">Nonce Guess</h2>
+                                <input type="text" name="guess" id="guess"
+                                       required
+                                       pattern="[0-9a-fA-F]{8}"
+                                       class="block w-full rounded-md py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-base sm:leading-6 peer invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+                                       placeholder=" ">
+                                <div class="hidden py-1.5 leading-6 gap-6 text-red-600 font-semibold peer-[&:not(:placeholder-shown):not(:focus):invalid]:block">
+                                    <p id="error_message">Must be 8 characters and only include a-f, A-F, and 0-9.</p>
+                                    </div>
+                                <div class="py-1.5">
+                                    <button type="button"
+                                            class="inline-flex py-1.5 items-center rounded-md bg-indigo-600 px-3 py-2 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500 group-invalid:pointer-events-none group-invalid:opacity-30">
+                                        Add Guess
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="max-w-xl mx-auto py-12 divide-y md:max-w-4xl">
+            <div class="sm:flex sm:items-center">
+                <div class="sm:flex-auto">
+                    <h2 class="text-lg font-semibold leading-6 text-gray-900">Current Guesses</h2>
+                </div>
+            </div>
+            <div class="mt-8 flow-root">
+                <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                    <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                        <div class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                            <table class="min-w-full divide-y divide-gray-300">
+                                <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col"
+                                        class="py-3.5 pl-4 pr-3 text-left text-base font-semibold text-gray-900 sm:pl-6">
+                                        Position
+                                    </th>
+                                    <th scope="col"
+                                        class="px-3 py-3.5 text-left text-base font-semibold text-gray-900">
+                                        Name
+                                    </th>
+                                    <th scope="col"
+                                        class="px-3 py-3.5 text-left text-base font-semibold text-gray-900">
+                                        Hex
+                                    </th>
+                                    <th scope="col"
+                                        class="px-3 py-3.5 text-left text-base font-semibold text-gray-900">
+                                        Decimal
+                                    </th>
+                                </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 bg-white">
+                                <tr>
+                                    <td class="whitespace-nowrap py-4 pl-4 pr-3 text-base font-mono font-medium text-gray-900 sm:pl-6">
+                                        1
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 text-base text-gray-500">Hal</td>
+                                    <td class="whitespace-nowrap px-3 py-4 font-mono text-base text-gray-500">
+                                        FEEDBEEF
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-4 font-mono text-base text-gray-500">
+                                        1,233,445,564
+                                    </td>
+                                </tr>
+
+                                <!-- More guesses... -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 gap-6">
+            <button type="submit" hx-put="/logout" hx-target="body"
+                    class="rounded-md bg-indigo-600 px-2.5 py-1.5 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
+                Logout
+            </button>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

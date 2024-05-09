@@ -1,10 +1,11 @@
-use std::str::FromStr;
-use crate::error::Error;
 use crate::model::{Guess, Target};
 use axum::async_trait;
 use sqlx::sqlite::SqliteRow;
 use sqlx::{FromRow, Row, Sqlite, Transaction};
-use webauthn_rs::prelude::{Passkey, Uuid};
+use std::prelude;
+use std::str::FromStr;
+use uuid::Uuid;
+use webauthn_rs::prelude::Passkey;
 
 #[async_trait]
 pub trait Db {
@@ -13,6 +14,9 @@ pub trait Db {
 
     // Select player UUID
     async fn select_player_uuid(&mut self, name: &String) -> Result<Uuid, Error>;
+
+    // Select player name
+    async fn select_player_name(&mut self, uuid: &Uuid) -> Result<String, Error>;
 
     /// Insert new player passkey
     async fn insert_player_passkey(&mut self, uuid: &Uuid, passkey: &Passkey) -> Result<(), Error>;
@@ -30,7 +34,12 @@ pub trait Db {
     async fn set_current_nonce(&mut self, nonce: u32) -> Result<(), Error>;
 
     /// Insert new nonce guess
-    async fn insert_guess(&mut self, uuid: &Uuid, block: Option<u32>, nonce: u32) -> Result<(), Error>;
+    async fn insert_guess(
+        &mut self,
+        uuid: &Uuid,
+        block: Option<u32>,
+        nonce: u32,
+    ) -> Result<(), Error>;
 
     /// Select guesses for target block
     async fn select_block_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error>;
@@ -51,25 +60,36 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         query
             .execute(&mut **self)
             .await
+            .map_err(Error::from)
             .map(|_| ())
-            .map_err(|err| <sqlx::Error as Into<Error>>::into(err))
     }
 
     async fn select_player_uuid(&mut self, name: &String) -> Result<Uuid, Error> {
-        let query = sqlx::query::<Sqlite>("SELECT uuid FROM player WHERE name IS ?")
-            .bind(name.clone());
+        let query =
+            sqlx::query::<Sqlite>("SELECT uuid FROM player WHERE name IS ?").bind(name.clone());
         query
             .fetch_one(&mut **self)
             .await
-            .map_err(|err| {dbg!(&err); err.into()})
+            .map_err(Error::from)
             .map(|row| row.get::<String, usize>(0))
-            .map(|uuid| Uuid::from_str(uuid.as_str()).unwrap())
+            .and_then(|uuid| Uuid::from_str(uuid.as_str()).map_err(Error::from))
+    }
+
+    async fn select_player_name(&mut self, uuid: &Uuid) -> Result<String, Error> {
+        dbg!(uuid);
+        let query =
+            sqlx::query::<Sqlite>("SELECT name FROM player WHERE uuid IS ?").bind(uuid.to_string());
+        query
+            .fetch_one(&mut **self)
+            .await
+            .map_err(Error::from)
+            .map(|row| row.get::<String, usize>(0))
+            .map_err(Error::from)
     }
 
     async fn insert_player_passkey(&mut self, uuid: &Uuid, passkey: &Passkey) -> Result<(), Error> {
-
         let mut passkey_cbor = Vec::new();
-        ciborium::into_writer(&passkey, &mut passkey_cbor).unwrap();
+        ciborium::into_writer(&passkey, &mut passkey_cbor).map_err(Error::CborSer)?;
 
         let query = sqlx::query("INSERT INTO auth (uuid, passkey) VALUES (?, ?)")
             .bind(uuid.to_string())
@@ -77,25 +97,21 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         query
             .execute(&mut **self)
             .await
-            .map(|_| ())
             .map_err(|err| err.into())
+            .map(|_| ())
     }
 
     async fn select_player_passkeys(&mut self, uuid: &Uuid) -> Result<Vec<Passkey>, Error> {
-        let query = sqlx::query::<Sqlite>(
-            "SELECT passkey FROM auth WHERE uuid IS ?",
-        )
-        .bind(uuid.to_string());
+        let query = sqlx::query::<Sqlite>("SELECT passkey FROM auth WHERE uuid IS ?")
+            .bind(uuid.to_string());
         query
             .fetch_all(&mut **self)
             .await
             .map_err(|err| err.into())
-            .map(|rows| {
+            .and_then(|rows| {
                 rows.into_iter()
                     .map(|row| row.get::<Vec<u8>, usize>(0))
-                    .map(|passkey| {
-                        ciborium::from_reader(&passkey[..]).unwrap()
-                    })
+                    .map(|passkey| ciborium::from_reader(&passkey[..]).map_err(Error::CborDe))
                     .collect()
             })
     }
@@ -105,13 +121,13 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         query
             .execute(&mut **self)
             .await
-            .map(|_| ())
             .map_err(|err| err.into())
+            .map(|_| ())
     }
 
     async fn select_current_target(&mut self) -> Result<Target, Error> {
         let query = sqlx::query_as::<Sqlite, TargetRow>(
-            "SELECT * FROM target WHERE block IS (SELECT MAX(block) FROM target)",
+            "SELECT * FROM target WHERE block IS (SELECT MAX(block) FROM target) AND nonce IS NULL",
         );
         query
             .fetch_one(&mut **self)
@@ -128,12 +144,16 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         query
             .execute(&mut **self)
             .await
-            .map(|_| ())
             .map_err(|err| err.into())
+            .map(|_| ())
     }
 
-    async fn insert_guess(&mut self, uuid: &Uuid, block: Option<u32>, nonce: u32) -> Result<(), Error> {
-
+    async fn insert_guess(
+        &mut self,
+        uuid: &Uuid,
+        block: Option<u32>,
+        nonce: u32,
+    ) -> Result<(), Error> {
         let query = sqlx::query("INSERT INTO guess (uuid, block, nonce) VALUES (?, ?, ?)")
             .bind(uuid.to_string())
             .bind(block)
@@ -141,13 +161,13 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         query
             .execute(&mut **self)
             .await
-            .map(|_| ())
             .map_err(|err| err.into())
+            .map(|_| ())
     }
 
     async fn select_block_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error> {
         let query = sqlx::query_as::<Sqlite, GuessRow>(
-            "SELECT name, block, nonce FROM guess \
+            "SELECT uuid, name, block, nonce FROM guess \
                  INNER JOIN player ON player.uuid = guess.uuid \
                  WHERE block IS ? \
                  ORDER BY nonce",
@@ -162,7 +182,7 @@ impl<'c> Db for Transaction<'c, Sqlite> {
 
     async fn select_guesses(&mut self) -> Result<Vec<Guess>, Error> {
         let query = sqlx::query_as::<Sqlite, GuessRow>(
-            "SELECT name, block, nonce FROM guess \
+            "SELECT player.uuid, name, block, nonce FROM guess \
             INNER JOIN player ON player.uuid = guess.uuid \
             WHERE block IS null \
             ORDER BY nonce",
@@ -179,8 +199,8 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         query
             .execute(&mut **self)
             .await
-            .map(|_| ())
             .map_err(|err| err.into())
+            .map(|_| ())
     }
 }
 
@@ -198,13 +218,27 @@ struct GuessRow(Guess);
 
 impl FromRow<'_, SqliteRow> for GuessRow {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
-        let player_name = row.get::<String, usize>(0);
-        let block = row.get::<Option<u32>, usize>(1);
-        let nonce = row.get::<u32, usize>(2);
+        let player_uuid = row.get::<String, usize>(0);
+        let player_name = row.get::<String, usize>(1);
+        let block = row.get::<Option<u32>, usize>(2);
+        let nonce = row.get::<u32, usize>(3);
         Ok(GuessRow(Guess {
+            uuid: Uuid::parse_str(player_uuid.as_str()).expect("uuid"),
             name: player_name,
             block,
             nonce,
         }))
     }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("sqlx: {0}")]
+    Sqlx(#[from] sqlx::Error),
+    #[error("uuid: {0}")]
+    Uuid(#[from] uuid::Error),
+    #[error("cbor serialize: {0}")]
+    CborSer(#[from] ciborium::ser::Error<std::io::Error>),
+    #[error("cbor deserialize: {0}")]
+    CborDe(#[from] ciborium::de::Error<std::io::Error>),
 }

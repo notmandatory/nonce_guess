@@ -1,16 +1,13 @@
-use super::Db;
-use crate::error::WebauthnError;
+use super::{db, Db};
 use crate::startup::AppState;
 use axum::{
     extract::{Extension, Json, Path},
     http::StatusCode,
     response::IntoResponse,
 };
-use serde::Serialize;
-use sqlx::{Acquire, Error, Sqlite, Transaction};
-use std::str::FromStr;
 use tower_sessions::Session;
 use tracing::{error, info};
+use uuid::Uuid;
 
 /*
  * Webauthn RS auth handlers.
@@ -19,6 +16,7 @@ use tracing::{error, info};
 
 // 1. Import the prelude - this contains everything needed for the server to function.
 use webauthn_rs::prelude::*;
+use crate::auth::Error::UserAlreadyRegistered;
 
 const REG_STATE: &str = "reg_state";
 const AUTH_STATE: &str = "auth_state";
@@ -62,7 +60,7 @@ pub async fn start_register(
     Extension(app_state): Extension<AppState>,
     session: Session,
     Path(username): Path<String>,
-) -> Result<impl IntoResponse, WebauthnError> {
+) -> Result<impl IntoResponse, Error> {
     info!("Start register");
     // We get the username from the URL, but you could get this via form submission or
     // some other process. In some parts of Webauthn, you could also use this as a "display name"
@@ -83,16 +81,15 @@ pub async fn start_register(
     //         .copied()
     //         .unwrap_or_else(Uuid::new_v4)
     // };
-    let mut tx = app_state
-        .pool
-        .begin()
-        .await
-        .map_err(|e| WebauthnError::Unknown)?;
-    let user_unique_id: Uuid = tx
-        .select_player_uuid(&username)
-        .await
-        .ok()
-        .unwrap_or_else(Uuid::new_v4);
+    let mut tx = app_state.pool.begin().await.map_err(|e| Error::Unknown)?;
+    let user_unique_id: Uuid = match tx.select_player_uuid(&username).await {
+        Ok(_uuid) => Err(UserAlreadyRegistered(username.clone())),
+        Err(db::Error::Sqlx(sqlx::Error::RowNotFound)) => Ok(Uuid::new_v4()),
+        Err(e) => Err(Error::from(e)),
+    }?;
+
+    // .ok()
+    // .unwrap_or_else(Uuid::new_v4);
 
     // Remove any previous registrations that may have occured from the session.
     session.remove_value("reg_state");
@@ -107,9 +104,12 @@ pub async fn start_register(
     //         .map(|keys| keys.iter().map(|sk| sk.cred_id().clone()).collect())
     // };
 
-    let exclude_credentials = tx.select_player_passkeys(&user_unique_id).await
-        .map_err(|e| WebauthnError::Unknown)
-        .map(|keys| keys.iter().map(|sk| sk.cred_id().clone()).collect()).ok();
+    let exclude_credentials = tx
+        .select_player_passkeys(&user_unique_id)
+        .await
+        .map_err(|e| Error::Unknown)
+        .map(|keys| keys.iter().map(|sk| sk.cred_id().clone()).collect())
+        .ok();
 
     let res = match app_state.webauthn.start_passkey_registration(
         user_unique_id,
@@ -129,7 +129,7 @@ pub async fn start_register(
         }
         Err(e) => {
             info!("challenge_register -> {:?}", e);
-            return Err(WebauthnError::Unknown);
+            return Err(Error::Unknown);
         }
     };
     Ok(res)
@@ -143,12 +143,12 @@ pub async fn finish_register(
     Extension(app_state): Extension<AppState>,
     session: Session,
     Json(reg): Json<RegisterPublicKeyCredential>,
-) -> Result<impl IntoResponse, WebauthnError> {
+) -> Result<impl IntoResponse, Error> {
     let (username, user_unique_id, reg_state) = match session.get("reg_state")? {
         Some((username, user_unique_id, reg_state)) => (username, user_unique_id, reg_state),
         None => {
             error!("Failed to get session");
-            return Err(WebauthnError::CorruptSession);
+            return Err(Error::CorruptSession);
         }
     };
     dbg!((&username, &user_unique_id, &reg_state));
@@ -160,11 +160,7 @@ pub async fn finish_register(
     {
         Ok(sk) => {
             // let mut users_guard = app_state.users.lock().await;
-            let mut tx = app_state
-                .pool
-                .begin()
-                .await
-                .map_err(|e| WebauthnError::Unknown)?;
+            let mut tx = app_state.pool.begin().await.map_err(|e| Error::Unknown)?;
 
             //TODO: This is where we would store the credential in a db, or persist them in some other way.
             // users_guard
@@ -172,12 +168,19 @@ pub async fn finish_register(
             //     .entry(user_unique_id)
             //     .and_modify(|keys| keys.push(sk.clone()))
             //     .or_insert_with(|| vec![sk.clone()]);
-            tx.insert_player(&username, &user_unique_id).await
-                .map_err(|e| WebauthnError::Unknown)?;
-            tx.insert_player_passkey(&user_unique_id, &sk).await
-                .map_err(|e| {dbg!(e); WebauthnError::Unknown})?;
-            tx.commit().await
-                .map_err(|e| {dbg!(e); WebauthnError::Unknown})?;
+            tx.insert_player(&username, &user_unique_id)
+                .await
+                .map_err(|e| Error::Unknown)?;
+            tx.insert_player_passkey(&user_unique_id, &sk)
+                .await
+                .map_err(|e| {
+                    dbg!(e);
+                    Error::Unknown
+                })?;
+            tx.commit().await.map_err(|e| {
+                dbg!(e);
+                Error::Unknown
+            })?;
 
             // let username: String = username;
             // users_guard
@@ -229,7 +232,7 @@ pub async fn start_authentication(
     Extension(app_state): Extension<AppState>,
     session: Session,
     Path(username): Path<String>,
-) -> Result<impl IntoResponse, WebauthnError> {
+) -> Result<impl IntoResponse, Error> {
     info!("Start Authentication");
     // We get the username from the URL, but you could get this via form submission or
     // some other process.
@@ -239,11 +242,7 @@ pub async fn start_authentication(
 
     // Get the set of keys that the user possesses
     // let users_guard = app_state.users.lock().await;
-    let mut tx = app_state
-        .pool
-        .begin()
-        .await
-        .map_err(|e| WebauthnError::Unknown)?;
+    let mut tx = app_state.pool.begin().await.map_err(|e| Error::Unknown)?;
 
     // Look up their unique id from the username
     // let user_unique_id = users_guard
@@ -251,15 +250,19 @@ pub async fn start_authentication(
     //     .get(&username)
     //     .copied()
     //     .ok_or(WebauthnError::UserNotFound)?;
-    let user_unique_id = tx.select_player_uuid(&username).await
-        .map_err(|e| WebauthnError::Unknown)?;
+    let user_unique_id = tx
+        .select_player_uuid(&username)
+        .await
+        .map_err(|e| Error::UserNotFound(username))?;
 
     // let allow_credentials = users_guard
     //     .keys
     //     .get(&user_unique_id)
     //     .ok_or(WebauthnError::UserHasNoCredentials)?;
-    let allow_credentials = tx.select_player_passkeys(&user_unique_id).await
-        .map_err(|e| WebauthnError::Unknown)?;
+    let allow_credentials = tx
+        .select_player_passkeys(&user_unique_id)
+        .await
+        .map_err(|e| Error::Unknown)?;
 
     let res = match app_state
         .webauthn
@@ -279,7 +282,7 @@ pub async fn start_authentication(
         }
         Err(e) => {
             info!("challenge_authenticate -> {:?}", e);
-            return Err(WebauthnError::Unknown);
+            return Err(Error::Unknown);
         }
     };
     Ok(res)
@@ -294,10 +297,9 @@ pub async fn finish_authentication(
     Extension(app_state): Extension<AppState>,
     session: Session,
     Json(auth): Json<PublicKeyCredential>,
-) -> Result<impl IntoResponse, WebauthnError> {
-    let (user_unique_id, auth_state): (Uuid, PasskeyAuthentication) = session
-        .get("auth_state")?
-        .ok_or(WebauthnError::CorruptSession)?;
+) -> Result<impl IntoResponse, Error> {
+    let (user_unique_id, auth_state): (Uuid, PasskeyAuthentication) =
+        session.get("auth_state")?.ok_or(Error::CorruptSession)?;
 
     session.remove_value("auth_state");
 
@@ -307,11 +309,7 @@ pub async fn finish_authentication(
     {
         Ok(auth_result) => {
             // let mut users_guard = app_state.users.lock().await;
-            let mut tx = app_state
-                .pool
-                .begin()
-                .await
-                .map_err(|e| WebauthnError::Unknown)?;
+            let mut tx = app_state.pool.begin().await.map_err(|e| Error::Unknown)?;
 
             // Update the credential counter, if possible.
             // TODO
@@ -327,7 +325,8 @@ pub async fn finish_authentication(
             //         })
             //     })
             //     .ok_or(WebauthnError::UserHasNoCredentials)?;
-            tx.select_player_passkeys(&user_unique_id).await
+            tx.select_player_passkeys(&user_unique_id)
+                .await
                 .map(|mut keys| {
                     keys.iter_mut().for_each(|sk| {
                         // This will update the credential if it's the matching
@@ -337,7 +336,7 @@ pub async fn finish_authentication(
                         // TODO persist updated sk
                     })
                 })
-                .map_err(|_| WebauthnError::UserHasNoCredentials)?;
+                .map_err(|_| Error::UserHasNoCredentials)?;
 
             session.insert(AUTH_UUID, &user_unique_id)?;
             StatusCode::OK
@@ -349,4 +348,24 @@ pub async fn finish_authentication(
     };
     info!("Authentication Successful!");
     Ok(res)
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum Error {
+    #[error("unknown webauthn error")]
+    Unknown,
+    #[error("corrupt Session")]
+    CorruptSession,
+    #[error("user not found")]
+    UserNotFound(String),
+    #[error("user already registered")]
+    UserAlreadyRegistered(String),
+    #[error("user has no credentials")]
+    UserHasNoCredentials,
+    #[error("deserializing session failed: {0}")]
+    InvalidSessionState(#[from] tower_sessions::session::Error),
+    #[error("db: {0}")]
+    Db(#[from] db::Error),
+    #[error("invalid input")]
+    InvalidInput,
 }
