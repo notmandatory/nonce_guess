@@ -2,6 +2,8 @@ target/
 dist/
 /ng_server/node_modules
 /ng_server/assets/main.css
-*.db
+/mockup/node_modules
+/mockup/assets/main.css
+*.sqlite
 *shm
 *wal

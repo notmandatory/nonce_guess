@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 pub use serde;
 pub use serde_json;
 pub use serde_with;
+use uuid::Uuid;
 
 /// The target block that players are trying to guess the nonce for.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
@@ -14,6 +15,7 @@ pub struct Target {
 /// A players guess for a target block nonce.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]
 pub struct Guess {
+    pub uuid: Uuid,
     pub block: Option<u32>,
     pub name: String,
     pub nonce: u32,

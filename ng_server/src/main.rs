@@ -7,7 +7,7 @@ use axum::response::{Html, Response};
 use axum::routing::{get, put};
 use axum::{
     error_handling::HandleErrorLayer, extract::Extension, http::StatusCode, response::IntoResponse,
-    routing::post, BoxError, Json, Router,
+    routing::post, BoxError, Form, Json, Router,
 };
 use clap::Parser;
 use rust_embed::RustEmbed;
@@ -24,15 +24,14 @@ use tower_sessions::{
     Expiry, MemoryStore, Session, SessionManagerLayer, SqliteStore,
 };
 use tracing::{debug, info};
-use webauthn_rs::prelude::{PasskeyRegistration, PublicKeyCredential, Uuid};
+use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration, PublicKeyCredential, Uuid};
 
 // The handlers that process the data can be found in the auth.rs file
 // This file contains the wasm client loading code and the axum routing
 use crate::auth::{
-    finish_authentication, finish_register, start_authentication, start_register, AUTH_UUID,
+    finish_authentication, finish_register, start_authentication, start_register, Error, AUTH_UUID,
 };
 use crate::db::Db;
-use crate::error::Error;
 use crate::model::{Block, Guess, Target};
 use crate::startup::AppState;
 
@@ -62,11 +61,11 @@ static GUESSED_BLOCK: &str = "guessed_block";
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct CliArgs {
-    /// Address this server should listen on, defaults to "127.0.0.1:8081"
+    /// Address this server should listen on, defaults to "localhost:8081"
     #[arg(short, long, value_name = "HOST:PORT")]
     listen_address: Option<String>,
-    #[arg(short, long, value_name = "NG_DB_URL")]
-    /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.db", defaults to in-memory DB
+    #[arg(short, long, value_name = "DB_URL", env = "NG_DB_URL")]
+    /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.sqlite", defaults to in-memory DB
     database_url: Option<String>,
 }
 
@@ -85,6 +84,7 @@ async fn main() {
         .database_url
         .unwrap_or_else(|| ":memory:".to_string())
         .add("?mode=rwc");
+    debug!("database_url: {}", &database_url);
 
     // setup connection pool
     let pool = SqlitePoolOptions::new()
@@ -133,13 +133,12 @@ async fn main() {
     //     .layer(CookieManagerLayer::new());
 
     let app = Router::new()
-        .route("/", get(home)) //.post(post_guess))
+        .route("/", get(home).post(post_guess))
         .route("/logout", put(logout))
         .route("/register_start/:username", post(start_register))
         .route("/register_finish", post(finish_register))
         .route("/login_start/:username", post(start_authentication))
         .route("/login_finish", post(finish_authentication))
-        // //.with_state(app_state)
         .layer(Extension(app_state))
         .layer(session_service)
         // .layer(CookieManagerLayer::new())
@@ -166,16 +165,14 @@ async fn main() {
 
 struct HtmlTemplate<T>(T);
 
-#[derive(Template)]
+#[derive(Template, Default, Debug)]
 #[template(path = "pages/home.html")]
 struct HomeTemplate {
     pub uuid: Option<Uuid>,
     pub name: Option<String>,
     pub target: Option<Target>,
-    pub guessed_block: Option<u32>,
     pub guesses: Vec<Guess>,
-    pub name_error: Option<String>,
-    pub nonce_error: Option<String>,
+    pub my_guess: Option<Guess>,
 }
 
 // async fn handler(cookies: Cookies) -> String {
@@ -198,28 +195,44 @@ async fn home(Extension(app_state): Extension<AppState>, session: Session) -> im
     // debug!("{:?}", &guessed_block);
     let uuid: Option<Uuid> = session.get(AUTH_UUID).expect("can't get AUTH_UUID");
     info!("Current uuid: {:?}", uuid);
-    // let name: Option<String> = uuid.map(|u| app_state.users.try_lock().unwrap().id_to_name.get(&u).cloned().unwrap());
-    // info!("Current user: {:?}", name);
-    let name = None;
 
-    info!("session: {:?}", &session);
-    let reg_state: Option<(String, Uuid, PasskeyRegistration)> = session.get("reg_state").unwrap();
-    info!("session.get('reg_state'): {:?}", reg_state);
-    let auth_state: Option<(Uuid, PasskeyRegistration)> = session.get("auth_state").unwrap();
-    info!("session.get('auth_state'): {:?}", auth_state);
+    let home = if let Some(some_uuid) = uuid {
+        let mut tx = app_state.pool.begin().await.expect("tx");
+        let name = tx.select_player_name(&some_uuid).await.ok();
+        let target = tx.select_current_target().await.ok();
+        let guesses = if let Some(some_target) = &target {
+            tx.select_block_guesses(some_target.block).await.ok()
+        } else {
+            tx.select_guesses().await.ok()
+        }
+        .unwrap_or_default();
+        let my_guess: Option<Guess> = uuid
+            .map(|uuid| guesses.iter().find(|g| g.uuid == uuid))
+            .flatten()
+            .map(|g| g.clone());
+
+        HomeTemplate {
+            uuid,
+            name,
+            target,
+            guesses,
+            my_guess,
+        }
+    } else {
+        Default::default()
+    };
+
+    dbg!(&home);
+    HtmlTemplate(home)
+
+    // info!("session: {:?}", &session);
+    // let reg_state: Option<(String, Uuid, PasskeyRegistration)> = session.get("reg_state").unwrap();
+    // info!("session.get('reg_state'): {:?}", reg_state);
+    // let auth_state: Option<(Uuid, PasskeyRegistration)> = session.get("auth_state").unwrap();
+    // info!("session.get('auth_state'): {:?}", auth_state);
     // info!("users.name_to_id: {:?}", &app_state.users.try_lock().unwrap().name_to_id);
     // info!("users.id_to_name: {:?}", &app_state.users.try_lock().unwrap().id_to_name);
     //info!("users.keys: {:?}", &app_state.users.try_lock().unwrap().keys);
-
-    HtmlTemplate(HomeTemplate {
-        uuid,
-        name,
-        target: None,
-        guessed_block: None,
-        name_error: None,
-        nonce_error: None,
-        guesses: Vec::new(),
-    })
 
     // // begin a db transaction
     // match state.pool.begin().await {
@@ -250,10 +263,8 @@ async fn logout(Extension(app_state): Extension<AppState>, session: Session) -> 
         uuid: None,
         name: None,
         target: None,
-        guessed_block: None,
-        name_error: None,
-        nonce_error: None,
         guesses: Vec::new(),
+        my_guess: None,
     })
 }
 
@@ -261,6 +272,65 @@ async fn logout(Extension(app_state): Extension<AppState>, session: Session) -> 
 struct GuessRequest {
     pub name: String,
     pub guess: String,
+}
+
+#[derive(Deserialize)]
+struct GuessForm {
+    guess: String,
+}
+
+async fn post_guess(
+    Extension(app_state): Extension<AppState>,
+    session: Session,
+    Form(guess_form): Form<GuessForm>,
+) -> Result<impl IntoResponse, Error> {
+    let guess = guess_form.guess;
+    dbg!(&guess);
+
+    let uuid: Option<Uuid> = session.get(AUTH_UUID).expect("can't get AUTH_UUID");
+    info!("Current uuid: {:?}", uuid);
+
+    let home = if let Some(some_uuid) = uuid {
+        let mut tx = app_state.pool.begin().await.expect("tx");
+        let name = tx.select_player_name(&some_uuid).await.ok();
+        let target = tx.select_current_target().await.ok();
+
+        // add guess
+        let block = target.as_ref().map(|t| t.block);
+        let nonce = u32::from_str_radix(guess.as_str(), 16).map_err(|e| Error::InvalidInput)?;
+        tx.insert_guess(&some_uuid, block, nonce)
+            .await
+            .map_err(|e| Error::Db(e))?;
+        tx.commit().await.expect("commit");
+
+        let mut tx = app_state.pool.begin().await.expect("tx");
+        let guesses = if let Some(some_target) = &target {
+            tx.select_block_guesses(some_target.block).await.ok()
+        } else {
+            tx.select_guesses().await.ok()
+        }
+        .unwrap_or_default();
+
+        let my_guess = Some(Guess {
+            uuid: some_uuid,
+            block,
+            name: name.clone().unwrap(),
+            nonce,
+        });
+
+        HomeTemplate {
+            uuid,
+            name,
+            target,
+            guesses,
+            my_guess,
+        }
+    } else {
+        Default::default()
+    };
+
+    dbg!(&home);
+    Ok(HtmlTemplate(home))
 }
 
 // async fn post_guess(
@@ -501,6 +571,39 @@ async fn not_found() -> Response {
 //     tx.commit().await?;
 //     Ok(())
 // }
+
+impl IntoResponse for auth::Error {
+    fn into_response(self) -> Response {
+        let (status_code, body) = match self {
+            auth::Error::CorruptSession => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "corrupt session".to_string(),
+            ),
+            auth::Error::UserNotFound(username) => (StatusCode::NOT_FOUND, username),
+            auth::Error::UserAlreadyRegistered(username) => (StatusCode::BAD_REQUEST, username),
+            auth::Error::Unknown => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "unknown error".to_string(),
+            ),
+            auth::Error::UserHasNoCredentials => (
+                StatusCode::UNAUTHORIZED,
+                "user has no credentials".to_string(),
+            ),
+            auth::Error::InvalidSessionState(_) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "deserializing session failed".to_string(),
+            ),
+            auth::Error::Db(_) => (StatusCode::INTERNAL_SERVER_ERROR, "db error".to_string()),
+            auth::Error::InvalidInput => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "invalid input".to_string(),
+            ),
+        };
+
+        // its often easiest to implement `IntoResponse` by calling other implementations
+        (status_code, body).into_response()
+    }
+}
 
 async fn handler_404() -> impl IntoResponse {
     (StatusCode::NOT_FOUND, "nothing to see here")
