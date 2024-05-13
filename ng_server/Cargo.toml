@@ -9,9 +9,11 @@ resolver = "2"
 [dependencies]
 anyhow = "1"
 askama = "0.12"
-axum = { version = "0.6.20", features = ["http2"] }
-axum-extra = { version = "0.8.0", features = [] }
-axum_session = {version = "0.10.1", default-features = false}
+axum = { version = "0.7", features = ["http2"] }
+axum-extra = { version = "0.9", features = [] }
+#axum_session = {version = "0.14"}
+#axum_session_sqlx = {version = "0.1.0", features = ["sqlite"]}
+axum-login = { version = "0.15.1" }
 ciborium = { version = "0.2" }
 clap = { version = "4.1.6", features = ["derive", "env"] }
 log = "0.4.20"
@@ -20,15 +22,16 @@ reqwest = { version = "0.11", features = ["json"] }
 rust-embed = { version = "8.0.0" }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1.0"
-serde_with = "2.3.3"
+serde_with = "3.8.1"
 sqlx = { version = "0.7.2", features = ["runtime-tokio", "any", "sqlite", "migrate"] }
 thiserror = "1"
 tokio = { version = "1.21", features = ["full"] }
 tower = { version = "0.4.13", features = ["full"] }
-tower-cookies = "0.9.0"
-tower-http = { version = "0.4.4", features = ["fs", "trace"] }
-tower-sessions = {  version = "0.6", features = ["sqlite-store"] }
+tower-cookies = "0.10.0"
+tower-http = { version = "0.5.2", features = ["fs", "trace"] }
+tower-sessions =  "0.12"
+tower-sessions-sqlx-store = {  version = "0.12.0", features = ["sqlite"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-webauthn-rs = { version = "0.4", features = ["danger-allow-state-serialisation"] }
+webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation"] }
 uuid = "1.6"

@@ -1,5 +1,4 @@
 use askama::Template;
-use axum::body::{boxed, Full};
 use axum::extract::{Path, State};
 use axum::handler::HandlerWithoutStateExt;
 use axum::http::{header, Uri};
@@ -9,6 +8,8 @@ use axum::{
     error_handling::HandleErrorLayer, extract::Extension, http::StatusCode, response::IntoResponse,
     routing::post, BoxError, Form, Json, Router,
 };
+use axum_login::tower_sessions::service::PlaintextCookie;
+use axum_login::{AuthManagerLayerBuilder, AuthSession};
 use clap::Parser;
 use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
@@ -18,21 +19,24 @@ use std::net::SocketAddr;
 use std::ops::{Add, Deref};
 use std::str::FromStr;
 use std::sync::Arc;
-use tower::ServiceBuilder;
+use tower::{Layer, ServiceBuilder};
+use tower_sessions::SessionStore;
 use tower_sessions::{
     cookie::{time::Duration, SameSite},
-    Expiry, MemoryStore, Session, SessionManagerLayer, SqliteStore,
+    Expiry, MemoryStore, Session, SessionManagerLayer,
 };
+use tower_sessions_sqlx_store::SqliteStore;
 use tracing::{debug, info};
 use webauthn_rs::prelude::{PasskeyAuthentication, PasskeyRegistration, PublicKeyCredential, Uuid};
 
 // The handlers that process the data can be found in the auth.rs file
 // This file contains the wasm client loading code and the axum routing
 use crate::auth::{
-    finish_authentication, finish_register, start_authentication, start_register, Error, AUTH_UUID,
+    finish_authentication, finish_register, start_authentication, start_register, Backend, Error,
+    AUTH_UUID,
 };
 use crate::db::Db;
-use crate::model::{Block, Guess, Target};
+use crate::model::{Block, Guess, Player, Target};
 use crate::startup::AppState;
 
 mod auth;
@@ -82,15 +86,27 @@ async fn main() {
     // get database URL from env
     let database_url = cli_args
         .database_url
-        .unwrap_or_else(|| ":memory:".to_string())
-        .add("?mode=rwc");
-    debug!("database_url: {}", &database_url);
+        //.unwrap_or_else(|| ":memory:".to_string())
+        .map(|url| url.add("?mode=rwc"));
+    debug!("database_url: {:?}", &database_url);
 
     // setup connection pool
-    let pool = SqlitePoolOptions::new()
-        .connect(&database_url)
-        .await
-        .expect("can connect to database");
+    let pool = if let Some(url) = database_url {
+        SqlitePoolOptions::new()
+            .connect(&url)
+            .await
+            .expect("connect to file backed database")
+    } else {
+        // this should only be used for testing
+        SqlitePoolOptions::new()
+            .max_connections(1)
+            .min_connections(1)
+            .idle_timeout(None)
+            .max_lifetime(None)
+            .connect(":memory:")
+            .await
+            .expect("connect to memory backed database")
+    };
 
     migrate!("./migrations")
         .run(&pool)
@@ -99,24 +115,33 @@ async fn main() {
 
     let app_state = AppState::new(pool.clone());
 
-    //let session_store = MemoryStore::default();
-    let session_store = SqliteStore::new(pool);
-    session_store
-        .migrate()
-        .await
-        .expect("couldn't migrate session store");
+    // Session store.
+    //let session_store = SqliteStore::<SessionSqlitePool>::new(Some(pool.clone().into()), session_store_config).await.unwrap();
+    let session_store = SqliteStore::new(pool.clone());
 
-    let session_service = ServiceBuilder::new()
-        .layer(HandleErrorLayer::new(|_: BoxError| async {
-            StatusCode::BAD_REQUEST
-        }))
-        .layer(
-            SessionManagerLayer::new(session_store)
-                .with_name("webauthnrs")
-                .with_same_site(SameSite::Strict)
-                .with_secure(false) // TODO: change this to true when running on an HTTPS/production server instead of locally
-                .with_expiry(Expiry::OnInactivity(Duration::seconds(360))),
-        );
+    // Session manager layer.
+    let session_manager_layer = SessionManagerLayer::new(session_store)
+        .with_name("webauthnrs")
+        .with_same_site(SameSite::Strict)
+        // TODO: change this to true when running on an HTTPS/production server instead of locally
+        .with_secure(false)
+        .with_expiry(Expiry::OnInactivity(Duration::seconds(360)));
+
+    // Auth service.
+    let backend = Backend::new(pool.clone());
+    let auth_layer = AuthManagerLayerBuilder::new(backend, session_manager_layer).build();
+
+    // let session_service = ServiceBuilder::new()
+    //     .layer(HandleErrorLayer::new(|_: BoxError| async {
+    //         StatusCode::BAD_REQUEST
+    //     }))
+    //     .layer(
+    //         SessionManagerLayer::new(session_store)
+    //             .with_name("webauthnrs")
+    //             .with_same_site(SameSite::Strict)
+    //             .with_secure(false) // TODO: change this to true when running on an HTTPS/production server instead of locally
+    //             .with_expiry(Expiry::OnInactivity(Duration::seconds(360))),
+    //     );
 
     // let api_routes = Router::new()
     //     .route("/target", get(get_current_target).post(post_target_block))
@@ -140,13 +165,13 @@ async fn main() {
         .route("/login_start/:username", post(start_authentication))
         .route("/login_finish", post(finish_authentication))
         .layer(Extension(app_state))
-        .layer(session_service)
+        .layer(auth_layer)
         // .layer(CookieManagerLayer::new())
         .fallback(handler_404);
 
     let app = Router::new()
         .merge(app)
-        .nest_service("/assets", static_handler.into_service());
+        .nest_service("/assets", tower_http::services::ServeDir::new("/assets"));
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
@@ -157,10 +182,8 @@ async fn main() {
     let addr = SocketAddr::from_str(listen_address.as_str()).unwrap();
     info!("listening on {}", addr);
 
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(listen_address).await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }
 
 struct HtmlTemplate<T>(T);
@@ -186,19 +209,25 @@ struct HomeTemplate {
 //     format!("Check your cookies. {:?}", guessed_block)
 // }
 
-async fn home(Extension(app_state): Extension<AppState>, session: Session) -> impl IntoResponse {
+async fn home(
+    mut auth_session: AuthSession<Backend>,
+    Extension(app_state): Extension<AppState>,
+) -> impl IntoResponse {
     // get users current guessed block from cookie
     // let guessed_block: Option<u32> = cookies
     //     .get(GUESSED_BLOCK)
     //     .map(|c| u32::from_str(c.value()).ok())
     //     .unwrap_or(None);
     // debug!("{:?}", &guessed_block);
-    let uuid: Option<Uuid> = session.get(AUTH_UUID).expect("can't get AUTH_UUID");
-    info!("Current uuid: {:?}", uuid);
 
-    let home = if let Some(some_uuid) = uuid {
+    // let uuid: Option<Uuid> = session.get(AUTH_UUID).expect("can't get AUTH_UUID");
+    let player: Option<Player> = auth_session.user;
+    info!("Current player: {:?}", player);
+
+    let home = if let Some(some_player) = player {
+        let uuid = some_player.uuid;
         let mut tx = app_state.pool.begin().await.expect("tx");
-        let name = tx.select_player_name(&some_uuid).await.ok();
+        let name = tx.select_player_name(&uuid).await.ok();
         let target = tx.select_current_target().await.ok();
         let guesses = if let Some(some_target) = &target {
             tx.select_block_guesses(some_target.block).await.ok()
@@ -206,13 +235,13 @@ async fn home(Extension(app_state): Extension<AppState>, session: Session) -> im
             tx.select_guesses().await.ok()
         }
         .unwrap_or_default();
-        let my_guess: Option<Guess> = uuid
-            .map(|uuid| guesses.iter().find(|g| g.uuid == uuid))
-            .flatten()
-            .map(|g| g.clone());
+        let my_guess: Option<Guess> = guesses
+            .iter()
+            .find(|g| g.uuid == uuid)
+            .map(|guess| guess.clone());
 
         HomeTemplate {
-            uuid,
+            uuid: Some(uuid),
             name,
             target,
             guesses,
@@ -257,8 +286,11 @@ async fn home(Extension(app_state): Extension<AppState>, session: Session) -> im
     // }
 }
 
-async fn logout(Extension(app_state): Extension<AppState>, session: Session) -> impl IntoResponse {
-    session.flush();
+async fn logout(
+    Extension(app_state): Extension<AppState>,
+    mut auth_session: AuthSession<Backend>,
+) -> impl IntoResponse {
+    let _player = auth_session.logout().await.expect("logout");
     HtmlTemplate(HomeTemplate {
         uuid: None,
         name: None,
@@ -281,24 +313,27 @@ struct GuessForm {
 
 async fn post_guess(
     Extension(app_state): Extension<AppState>,
-    session: Session,
+    mut auth_session: AuthSession<Backend>,
     Form(guess_form): Form<GuessForm>,
 ) -> Result<impl IntoResponse, Error> {
     let guess = guess_form.guess;
     dbg!(&guess);
 
-    let uuid: Option<Uuid> = session.get(AUTH_UUID).expect("can't get AUTH_UUID");
-    info!("Current uuid: {:?}", uuid);
+    //let uuid: Option<Uuid> = session.get(AUTH_UUID).expect("can't get AUTH_UUID");
 
-    let home = if let Some(some_uuid) = uuid {
+    let player: Option<Player> = auth_session.user;
+    info!("Current player: {:?}", player);
+
+    let home = if let Some(some_player) = player {
+        let uuid = some_player.uuid;
         let mut tx = app_state.pool.begin().await.expect("tx");
-        let name = tx.select_player_name(&some_uuid).await.ok();
+        let name = tx.select_player_name(&uuid).await.ok();
         let target = tx.select_current_target().await.ok();
 
         // add guess
         let block = target.as_ref().map(|t| t.block);
         let nonce = u32::from_str_radix(guess.as_str(), 16).map_err(|e| Error::InvalidInput)?;
-        tx.insert_guess(&some_uuid, block, nonce)
+        tx.insert_guess(&uuid, block, nonce)
             .await
             .map_err(|e| Error::Db(e))?;
         tx.commit().await.expect("commit");
@@ -312,14 +347,14 @@ async fn post_guess(
         .unwrap_or_default();
 
         let my_guess = Some(Guess {
-            uuid: some_uuid,
+            uuid,
             block,
             name: name.clone().unwrap(),
             nonce,
         });
 
         HomeTemplate {
-            uuid,
+            uuid: Some(uuid),
             name,
             target,
             guesses,
@@ -440,53 +475,53 @@ where
     }
 }
 
-async fn static_handler(uri: Uri) -> Response {
-    let path = uri.path().trim_start_matches('/');
+// async fn static_handler(uri: Uri) -> Response {
+//     let path = uri.path().trim_start_matches('/');
+//
+//     if path.is_empty() || path == INDEX_HTML {
+//         return index_html().await;
+//     }
+//
+//     match Assets::get(path) {
+//         Some(content) => {
+//             let body = tower_http::body::Full::from(content.data);
+//             let mime = mime_guess::from_path(path).first_or_octet_stream();
+//
+//             Response::builder()
+//                 .header(header::CONTENT_TYPE, mime.as_ref())
+//                 .body(body)
+//                 .unwrap()
+//         }
+//         None => {
+//             if path.contains('.') {
+//                 return not_found().await;
+//             }
+//
+//             index_html().await
+//         }
+//     }
+// }
 
-    if path.is_empty() || path == INDEX_HTML {
-        return index_html().await;
-    }
+// async fn index_html() -> Response {
+//     match Assets::get(INDEX_HTML) {
+//         Some(content) => {
+//             let body = boxed(Full::from(content.data));
+//
+//             Response::builder()
+//                 .header(header::CONTENT_TYPE, "text/html")
+//                 .body(body)
+//                 .unwrap()
+//         }
+//         None => not_found().await,
+//     }
+// }
 
-    match Assets::get(path) {
-        Some(content) => {
-            let body = boxed(Full::from(content.data));
-            let mime = mime_guess::from_path(path).first_or_octet_stream();
-
-            Response::builder()
-                .header(header::CONTENT_TYPE, mime.as_ref())
-                .body(body)
-                .unwrap()
-        }
-        None => {
-            if path.contains('.') {
-                return not_found().await;
-            }
-
-            index_html().await
-        }
-    }
-}
-
-async fn index_html() -> Response {
-    match Assets::get(INDEX_HTML) {
-        Some(content) => {
-            let body = boxed(Full::from(content.data));
-
-            Response::builder()
-                .header(header::CONTENT_TYPE, "text/html")
-                .body(body)
-                .unwrap()
-        }
-        None => not_found().await,
-    }
-}
-
-async fn not_found() -> Response {
-    Response::builder()
-        .status(StatusCode::NOT_FOUND)
-        .body(boxed(Full::from("404")))
-        .unwrap()
-}
+// async fn not_found() -> Response {
+//     Response::builder()
+//         .status(StatusCode::NOT_FOUND)
+//         .body(boxed(Full::from("404")))
+//         .unwrap()
+// }
 
 // async fn get_current_target(State(state): State<Arc<AppState>>) -> Result<Json<Target>, Error> {
 //     let mut tx = state.pool.begin().await?;

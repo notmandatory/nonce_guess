@@ -1,9 +1,19 @@
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 pub use serde;
 pub use serde_json;
 pub use serde_with;
 use uuid::Uuid;
+use webauthn_rs::prelude::{CredentialID, Passkey};
+
+/// The players login information
+#[derive(Debug, Clone)]
+pub struct Player {
+    pub(crate) uuid: Uuid,
+    pub(crate) name: String,
+    pub(crate) passkeys: Vec<Passkey>,
+}
 
 /// The target block that players are trying to guess the nonce for.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]

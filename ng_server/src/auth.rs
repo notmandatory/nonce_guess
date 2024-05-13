@@ -1,12 +1,19 @@
-use super::{db, Db};
+use super::{auth, db, Db};
 use crate::startup::AppState;
 use axum::{
     extract::{Extension, Json, Path},
     http::StatusCode,
     response::IntoResponse,
 };
+use axum_login::axum::async_trait;
+use axum_login::{AuthUser, AuthnBackend, AuthzBackend, UserId};
+use serde::{Deserialize, Serialize};
+use sqlx::{Pool, Sqlite};
+use std::collections::HashSet;
+use std::ops::Deref;
+use std::sync::Arc;
 use tower_sessions::Session;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 /*
@@ -15,8 +22,9 @@ use uuid::Uuid;
  */
 
 // 1. Import the prelude - this contains everything needed for the server to function.
-use webauthn_rs::prelude::*;
 use crate::auth::Error::UserAlreadyRegistered;
+use crate::model::Player;
+use webauthn_rs::prelude::*;
 
 const REG_STATE: &str = "reg_state";
 const AUTH_STATE: &str = "auth_state";
@@ -57,7 +65,7 @@ pub const AUTH_UUID: &str = "auth_uuid";
 // the challenge to the browser.
 
 pub async fn start_register(
-    Extension(app_state): Extension<AppState>,
+    mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Path(username): Path<String>,
 ) -> Result<impl IntoResponse, Error> {
@@ -81,7 +89,7 @@ pub async fn start_register(
     //         .copied()
     //         .unwrap_or_else(Uuid::new_v4)
     // };
-    let mut tx = app_state.pool.begin().await.map_err(|e| Error::Unknown)?;
+    let mut tx = auth_session.backend.pool.begin().await.map_err(|e| Error::Unknown)?;
     let user_unique_id: Uuid = match tx.select_player_uuid(&username).await {
         Ok(_uuid) => Err(UserAlreadyRegistered(username.clone())),
         Err(db::Error::Sqlx(sqlx::Error::RowNotFound)) => Ok(Uuid::new_v4()),
@@ -111,7 +119,7 @@ pub async fn start_register(
         .map(|keys| keys.iter().map(|sk| sk.cred_id().clone()).collect())
         .ok();
 
-    let res = match app_state.webauthn.start_passkey_registration(
+    let res = match auth_session.backend.webauthn.start_passkey_registration(
         user_unique_id,
         &username,
         &username,
@@ -123,6 +131,7 @@ pub async fn start_register(
             // not open to replay attacks. If this was a cookie store, this would be UNSAFE.
             session
                 .insert("reg_state", (username, user_unique_id, reg_state))
+                .await
                 .expect("Failed to insert");
             info!("Registration Successful!");
             Json(ccr)
@@ -140,11 +149,11 @@ pub async fn start_register(
 // to verify these and persist them.
 
 pub async fn finish_register(
-    Extension(app_state): Extension<AppState>,
+    mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Json(reg): Json<RegisterPublicKeyCredential>,
 ) -> Result<impl IntoResponse, Error> {
-    let (username, user_unique_id, reg_state) = match session.get("reg_state")? {
+    let (username, user_unique_id, reg_state) = match session.get("reg_state").await? {
         Some((username, user_unique_id, reg_state)) => (username, user_unique_id, reg_state),
         None => {
             error!("Failed to get session");
@@ -154,13 +163,13 @@ pub async fn finish_register(
     dbg!((&username, &user_unique_id, &reg_state));
     session.remove_value("reg_state");
 
-    let res = match app_state
+    let res = match auth_session.backend
         .webauthn
         .finish_passkey_registration(&reg, &reg_state)
     {
         Ok(sk) => {
             // let mut users_guard = app_state.users.lock().await;
-            let mut tx = app_state.pool.begin().await.map_err(|e| Error::Unknown)?;
+            let mut tx = auth_session.backend.pool.begin().await.map_err(|e| Error::Unknown)?;
 
             //TODO: This is where we would store the credential in a db, or persist them in some other way.
             // users_guard
@@ -174,11 +183,11 @@ pub async fn finish_register(
             tx.insert_player_passkey(&user_unique_id, &sk)
                 .await
                 .map_err(|e| {
-                    dbg!(e);
+                    debug!("{:?}", e);
                     Error::Unknown
                 })?;
             tx.commit().await.map_err(|e| {
-                dbg!(e);
+                debug!("{:?}", e);
                 Error::Unknown
             })?;
 
@@ -229,7 +238,7 @@ pub async fn finish_register(
 // The user indicates the wish to start authentication and we need to provide a challenge.
 
 pub async fn start_authentication(
-    Extension(app_state): Extension<AppState>,
+    mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Path(username): Path<String>,
 ) -> Result<impl IntoResponse, Error> {
@@ -242,7 +251,7 @@ pub async fn start_authentication(
 
     // Get the set of keys that the user possesses
     // let users_guard = app_state.users.lock().await;
-    let mut tx = app_state.pool.begin().await.map_err(|e| Error::Unknown)?;
+    let mut tx = auth_session.backend.pool.begin().await.map_err(|e| Error::Unknown)?;
 
     // Look up their unique id from the username
     // let user_unique_id = users_guard
@@ -253,7 +262,13 @@ pub async fn start_authentication(
     let user_unique_id = tx
         .select_player_uuid(&username)
         .await
-        .map_err(|e| Error::UserNotFound(username))?;
+        .map_err(|e| match e {
+            db::Error::Sqlx(sqlx::Error::RowNotFound) => Error::UserNotFound(username),
+            e => {
+                error!("select_player_uuid error: {:?}", e);
+                Error::Db(e)
+            }
+        })?;
 
     // let allow_credentials = users_guard
     //     .keys
@@ -264,7 +279,7 @@ pub async fn start_authentication(
         .await
         .map_err(|e| Error::Unknown)?;
 
-    let res = match app_state
+    let res = match auth_session.backend
         .webauthn
         .start_passkey_authentication(allow_credentials.as_slice())
     {
@@ -277,6 +292,7 @@ pub async fn start_authentication(
             // not open to replay attacks. If this was a cookie store, this would be UNSAFE.
             session
                 .insert("auth_state", (user_unique_id, auth_state))
+                .await
                 .expect("Failed to insert");
             Json(rcr)
         }
@@ -294,60 +310,234 @@ pub async fn start_authentication(
 // this is an authentication failure.
 
 pub async fn finish_authentication(
-    Extension(app_state): Extension<AppState>,
+    mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Json(auth): Json<PublicKeyCredential>,
 ) -> Result<impl IntoResponse, Error> {
     let (user_unique_id, auth_state): (Uuid, PasskeyAuthentication) =
-        session.get("auth_state")?.ok_or(Error::CorruptSession)?;
+        session.get("auth_state").await?.ok_or(Error::CorruptSession)?;
 
-    session.remove_value("auth_state");
+    session.remove_value("auth_state").await.map_err(Error::from)?;
 
-    let res = match app_state
-        .webauthn
-        .finish_passkey_authentication(&auth, &auth_state)
-    {
-        Ok(auth_result) => {
-            // let mut users_guard = app_state.users.lock().await;
-            let mut tx = app_state.pool.begin().await.map_err(|e| Error::Unknown)?;
+    // TODO fix error handling
+    let player = auth_session.authenticate((auth, auth_state)).await.map_err(|e| Error::CorruptSession)?;
+    if let Some(_player) = player {
+        Ok(StatusCode::OK)
+    } else {
+        Ok(StatusCode::UNAUTHORIZED)
+    }
+    // let res = match auth_session.backend
+    //     .webauthn
+    //     .finish_passkey_authentication(&auth, &auth_state)
+    // {
+    //     Ok(auth_result) => {
+    //         // let mut users_guard = app_state.users.lock().await;
+    //         let mut tx = auth_session.backend.pool.begin().await.map_err(|e| Error::Unknown)?;
+    //
+    //         // Update the credential counter, if possible.
+    //         // TODO
+    //         // users_guard
+    //         //     .keys
+    //         //     .get_mut(&user_unique_id)
+    //         //     .map(|keys| {
+    //         //         keys.iter_mut().for_each(|sk| {
+    //         //             // This will update the credential if it's the matching
+    //         //             // one. Otherwise it's ignored. That is why it is safe to
+    //         //             // iterate this over the full list.
+    //         //             sk.update_credential(&auth_result);
+    //         //         })
+    //         //     })
+    //         //     .ok_or(WebauthnError::UserHasNoCredentials)?;
+    //         tx.select_player_passkeys(&user_unique_id)
+    //             .await
+    //             .map(|mut keys| {
+    //                 keys.iter_mut().for_each(|sk| {
+    //                     // This will update the credential if it's the matching
+    //                     // one. Otherwise it's ignored. That is why it is safe to
+    //                     // iterate this over the full list.
+    //                     sk.update_credential(&auth_result);
+    //                     // TODO persist updated sk
+    //                 })
+    //             })
+    //             .map_err(|_| Error::UserHasNoCredentials)?;
+    //
+    //         session.insert(AUTH_UUID, &user_unique_id).await?;
+    //         StatusCode::OK
+    //     }
+    //     Err(e) => {
+    //         info!("challenge_register -> {:?}", e);
+    //         StatusCode::BAD_REQUEST
+    //     }
+    // };
+    // info!("Authentication Successful!");
+    // Ok(res)
+}
 
-            // Update the credential counter, if possible.
-            // TODO
-            // users_guard
-            //     .keys
-            //     .get_mut(&user_unique_id)
-            //     .map(|keys| {
-            //         keys.iter_mut().for_each(|sk| {
-            //             // This will update the credential if it's the matching
-            //             // one. Otherwise it's ignored. That is why it is safe to
-            //             // iterate this over the full list.
-            //             sk.update_credential(&auth_result);
-            //         })
-            //     })
-            //     .ok_or(WebauthnError::UserHasNoCredentials)?;
-            tx.select_player_passkeys(&user_unique_id)
-                .await
-                .map(|mut keys| {
-                    keys.iter_mut().for_each(|sk| {
-                        // This will update the credential if it's the matching
-                        // one. Otherwise it's ignored. That is why it is safe to
-                        // iterate this over the full list.
-                        sk.update_credential(&auth_result);
-                        // TODO persist updated sk
-                    })
-                })
-                .map_err(|_| Error::UserHasNoCredentials)?;
+impl AuthUser for Player {
+    type Id = Uuid;
 
-            session.insert(AUTH_UUID, &user_unique_id)?;
-            StatusCode::OK
+    fn id(&self) -> Self::Id {
+        self.uuid
+    }
+
+    fn session_auth_hash(&self) -> &[u8] {
+        self.passkeys
+            .first()
+            .expect("at least one passkey")
+            .cred_id()
+            .as_slice()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Backend {
+    pub pool: Pool<Sqlite>,
+    pub webauthn: Arc<Webauthn>,
+}
+
+impl Backend {
+    pub(crate) fn new(pool: Pool<Sqlite>) -> Self {
+        // Effective domain name.
+        let rp_id = "localhost";
+        // Url containing the effective domain name
+        // MUST include the port number!
+        let rp_origin = Url::parse("http://localhost:8081").expect("Invalid URL");
+        let builder = WebauthnBuilder::new(rp_id, &rp_origin).expect("Invalid configuration");
+
+        // Now, with the builder you can define other options.
+        // Set a "nice" relying party name. Has no security properties and
+        // may be changed in the future.
+        let builder = builder.rp_name("Axum Webauthn-rs");
+
+        // Consume the builder and create our webauthn instance.
+        let webauthn = Arc::new(builder.build().expect("Invalid configuration"));
+
+        Self { pool, webauthn }
+    }
+}
+
+// We use a type alias for convenience.
+//
+// Note that we've supplied our concrete backend here.
+pub type AuthSession = axum_login::AuthSession<Backend>;
+
+#[async_trait]
+impl AuthnBackend for Backend {
+    type User = Player;
+    type Credentials = (PublicKeyCredential, PasskeyAuthentication);
+    type Error = Error;
+
+    async fn authenticate(
+        &self,
+        creds: Self::Credentials,
+    ) -> Result<Option<Self::User>, Self::Error> {
+        // let mut tx = self
+        //     .pool
+        //     .begin()
+        //     .await
+        //     .map_err(db::Error::Sqlx)
+        //     .map_err(Error::Db)?;
+        // tx.select_player_by_credential(&creds)
+        //     .await
+        //     .map_err(Error::Db)
+
+        let (auth, auth_state) = creds;
+
+        let mut tx = self.pool.begin().await
+            .map_err(db::Error::from)
+            .map_err(Error::from)?;
+
+        let uuid = auth.get_user_unique_id()
+            .map(|uuid_bytes| Uuid::from_slice(uuid_bytes).expect("uuid"));
+
+        if let Some(user_unique_id) = uuid {
+            match self
+                .webauthn
+                .finish_passkey_authentication(&auth, &auth_state)
+            {
+                Ok(auth_result) => {
+                    // let mut users_guard = app_state.users.lock().await;
+
+                    // Update the credential counter, if possible.
+                    // TODO
+                    // users_guard
+                    //     .keys
+                    //     .get_mut(&user_unique_id)
+                    //     .map(|keys| {
+                    //         keys.iter_mut().for_each(|sk| {
+                    //             // This will update the credential if it's the matching
+                    //             // one. Otherwise it's ignored. That is why it is safe to
+                    //             // iterate this over the full list.
+                    //             sk.update_credential(&auth_result);
+                    //         })
+                    //     })
+                    //     .ok_or(WebauthnError::UserHasNoCredentials)?;
+                    tx.select_player_passkeys(&user_unique_id)
+                        .await
+                        .map(|mut keys| {
+                            keys.iter_mut().for_each(|sk| {
+                                // This will update the credential if it's the matching
+                                // one. Otherwise it's ignored. That is why it is safe to
+                                // iterate this over the full list.
+                                sk.update_credential(&auth_result);
+                                // TODO persist updated sk
+                            })
+                        })
+                        .map_err(|_| Error::UserHasNoCredentials)?;
+
+                    // session.insert(AUTH_UUID, &user_unique_id).await?;
+                    // StatusCode::OK
+                    let player = tx.select_player_by_uuid(&user_unique_id).await
+                        .expect("player"); // TODO fix error handling
+                    info!("Authentication Successful!");
+                    Ok(player)
+                }
+                Err(e) => {
+                    info!("challenge_register -> {:?}", e);
+                    Ok(None)
+                }
+            }
+        } else {
+            Ok(None)
         }
-        Err(e) => {
-            info!("challenge_register -> {:?}", e);
-            StatusCode::BAD_REQUEST
-        }
-    };
-    info!("Authentication Successful!");
-    Ok(res)
+    }
+
+    async fn get_user(&self, user_id: &UserId<Self>) -> Result<Option<Self::User>, Self::Error> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(db::Error::Sqlx)
+            .map_err(Error::Db)?;
+
+        tx.select_player_by_uuid(user_id).await.map_err(Error::Db)
+    }
+}
+
+// Permissions that can be granted to a player.
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
+pub(crate) enum Permission {
+    /// Able to change the target block height.
+    PostTargetBlock,
+}
+
+#[async_trait]
+impl AuthzBackend for Backend {
+    type Permission = Permission;
+
+    async fn get_user_permissions(
+        &self,
+        user: &Self::User,
+    ) -> Result<HashSet<Self::Permission>, Self::Error> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(db::Error::Sqlx)
+            .map_err(Error::Db)?;
+
+        tx.select_permissions(&user.uuid).await.map_err(Error::from)
+    }
 }
 
 #[derive(thiserror::Error, Debug)]

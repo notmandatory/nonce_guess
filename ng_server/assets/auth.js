@@ -24,7 +24,7 @@ function register() {
                 } else {
                     flash_message.classList.add('text-red-600');
                     flash_message.classList.remove('hidden');
-                    flash_message.innerHTML = "Error while registering!";
+                    flash_message.innerHTML = "Username already registered!";
                 }
                 return response.json()
             }
