@@ -1,39 +1,60 @@
-use crate::model::{Guess, Target};
+use crate::auth::Permission;
+use crate::model::{Guess, Player, Target};
 use axum::async_trait;
 use sqlx::sqlite::SqliteRow;
 use sqlx::{FromRow, Row, Sqlite, Transaction};
+use std::collections::HashSet;
 use std::prelude;
 use std::str::FromStr;
 use uuid::Uuid;
-use webauthn_rs::prelude::Passkey;
+use webauthn_rs::prelude::{CredentialID, Passkey, PublicKeyCredential};
 
 #[async_trait]
 pub trait Db {
-    /// Insert new player
+    /// Insert new player.
     async fn insert_player(&mut self, name: &String, uuid: &Uuid) -> Result<(), Error>;
 
-    // Select player UUID
+    /// Select player by UUID.
+    async fn select_player_by_uuid(&mut self, uuid: &Uuid) -> Result<Option<Player>, Error>;
+
+    /// Select player by credential id.
+    async fn select_player_by_credential(
+        &mut self,
+        cred_id: &CredentialID,
+    ) -> Result<Option<Player>, Error>;
+
+    /// Select player UUID.
     async fn select_player_uuid(&mut self, name: &String) -> Result<Uuid, Error>;
 
-    // Select player name
+    /// Select player name.
     async fn select_player_name(&mut self, uuid: &Uuid) -> Result<String, Error>;
 
-    /// Insert new player passkey
+    /// Insert new player passkey.
     async fn insert_player_passkey(&mut self, uuid: &Uuid, passkey: &Passkey) -> Result<(), Error>;
 
-    /// Select player passkeys
+    /// Select player passkeys.
     async fn select_player_passkeys(&mut self, uuid: &Uuid) -> Result<Vec<Passkey>, Error>;
 
-    /// Insert new target block
+    /// Insert player permissions.
+    async fn insert_permission(
+        &mut self,
+        uuid: &Uuid,
+        permissions: &Permission,
+    ) -> Result<(), Error>;
+
+    /// Select player permissions.
+    async fn select_permissions(&mut self, cred_id: &Uuid) -> Result<HashSet<Permission>, Error>;
+
+    /// Insert new target block.
     async fn insert_target(&mut self, block: u32) -> Result<(), Error>;
 
-    /// Select current target block
+    /// Select current target block.
     async fn select_current_target(&mut self) -> Result<Target, Error>;
 
-    /// Set current target block nonce
+    /// Set current target block nonce.
     async fn set_current_nonce(&mut self, nonce: u32) -> Result<(), Error>;
 
-    /// Insert new nonce guess
+    /// Insert new nonce guess.
     async fn insert_guess(
         &mut self,
         uuid: &Uuid,
@@ -41,13 +62,13 @@ pub trait Db {
         nonce: u32,
     ) -> Result<(), Error>;
 
-    /// Select guesses for target block
+    /// Select guesses for target block.
     async fn select_block_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error>;
 
-    /// Select guesses with no found target block
+    /// Select guesses with no found target block.
     async fn select_guesses(&mut self) -> Result<Vec<Guess>, Error>;
 
-    /// Set block for guesses without a set block
+    /// Set block for guesses without a set block.
     async fn set_guesses_block(&mut self, block: u32) -> Result<(), Error>;
 }
 
@@ -75,6 +96,61 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .and_then(|uuid| Uuid::from_str(uuid.as_str()).map_err(Error::from))
     }
 
+    async fn select_player_by_credential(
+        &mut self,
+        cred_id: &CredentialID,
+    ) -> Result<Option<Player>, Error> {
+        let name_uuid_query = sqlx::query::<Sqlite>("SELECT player.name, player.uuid FROM player JOIN authn ON player.uuid = authn.uuid WHERE authn.cred_id IS ?")
+                .bind(cred_id.as_slice());
+
+        let name_uuid = name_uuid_query
+            .fetch_optional(&mut **self)
+            .await
+            .map_err(Error::from)
+            .map(|opt_row| {
+                opt_row.map(|row| {
+                    let name = row.get::<String, usize>(0);
+                    let uuid = row.get::<String, usize>(1);
+                    (name, uuid)
+                })
+            })?;
+
+        if let Some((name, uuid)) = name_uuid {
+            let uuid = Uuid::from_str(uuid.as_str()).map_err(Error::from)?;
+            let passkeys = self.select_player_passkeys(&uuid).await?;
+            Ok(Some(Player {
+                uuid,
+                name,
+                passkeys,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    async fn select_player_by_uuid(&mut self, uuid: &Uuid) -> Result<Option<Player>, Error> {
+        let name_query =
+            sqlx::query::<Sqlite>("SELECT name FROM player WHERE uuid IS ?").bind(uuid.to_string());
+
+        let name = name_query
+            .fetch_optional(&mut **self)
+            .await
+            .map_err(Error::Sqlx)?
+            .map(|row| row.get::<String, usize>(0));
+
+        if let Some(name) = name {
+            let uuid = uuid.clone();
+            let passkeys = self.select_player_passkeys(&uuid).await?;
+            Ok(Some(Player {
+                uuid,
+                name,
+                passkeys,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
     async fn select_player_name(&mut self, uuid: &Uuid) -> Result<String, Error> {
         dbg!(uuid);
         let query =
@@ -88,32 +164,69 @@ impl<'c> Db for Transaction<'c, Sqlite> {
     }
 
     async fn insert_player_passkey(&mut self, uuid: &Uuid, passkey: &Passkey) -> Result<(), Error> {
+        let cred_id = passkey.cred_id();
         let mut passkey_cbor = Vec::new();
-        ciborium::into_writer(&passkey, &mut passkey_cbor).map_err(Error::CborSer)?;
+        ciborium::into_writer(passkey, &mut passkey_cbor).map_err(Error::CborSer)?;
 
-        let query = sqlx::query("INSERT INTO auth (uuid, passkey) VALUES (?, ?)")
+        let query = sqlx::query("INSERT INTO authn (cred_id, uuid, passkey) VALUES (?, ?, ?)")
+            .bind(cred_id.as_slice())
             .bind(uuid.to_string())
             .bind(passkey_cbor.as_slice());
         query
             .execute(&mut **self)
             .await
-            .map_err(|err| err.into())
+            .map_err(Error::from)
             .map(|_| ())
     }
 
     async fn select_player_passkeys(&mut self, uuid: &Uuid) -> Result<Vec<Passkey>, Error> {
-        let query = sqlx::query::<Sqlite>("SELECT passkey FROM auth WHERE uuid IS ?")
+        let query = sqlx::query::<Sqlite>("SELECT passkey FROM authn WHERE uuid IS ?")
             .bind(uuid.to_string());
         query
             .fetch_all(&mut **self)
             .await
-            .map_err(|err| err.into())
+            .map_err(Error::from)
             .and_then(|rows| {
                 rows.into_iter()
                     .map(|row| row.get::<Vec<u8>, usize>(0))
                     .map(|passkey| ciborium::from_reader(&passkey[..]).map_err(Error::CborDe))
                     .collect()
             })
+    }
+
+    async fn insert_permission(
+        &mut self,
+        uuid: &Uuid,
+        permission: &Permission,
+    ) -> Result<(), Error> {
+        let json = serde_json::to_string(permission).map_err(Error::from)?;
+
+        let query = sqlx::query::<Sqlite>("INSERT INTO authz (uuid, permission) VALUES (?, ?)")
+            .bind(uuid.to_string())
+            .bind(json);
+
+        query
+            .execute(&mut **self)
+            .await
+            .map_err(Error::from)
+            .map(|_| ())
+    }
+
+    async fn select_permissions(&mut self, uuid: &Uuid) -> Result<HashSet<Permission>, Error> {
+        let query = sqlx::query::<Sqlite>("SELECT permission FROM authz WHERE uuid IS ?")
+            .bind(uuid.to_string());
+
+        query
+            .fetch_all(&mut **self)
+            .await
+            .map_err(Error::from)
+            .and_then(|rows| {
+                rows.into_iter()
+                    .map(|row| row.get::<String, usize>(0))
+                    .map(|json| serde_json::from_str(json.as_str()).map_err(Error::from))
+                    .collect()
+            })
+        // serde_json::to_string(keychain).expect("keychain json")
     }
 
     async fn insert_target(&mut self, block: u32) -> Result<(), Error> {
@@ -241,4 +354,6 @@ pub enum Error {
     CborSer(#[from] ciborium::ser::Error<std::io::Error>),
     #[error("cbor deserialize: {0}")]
     CborDe(#[from] ciborium::de::Error<std::io::Error>),
+    #[error("serde json: {0}")]
+    SerdeJson(#[from] serde_json::Error),
 }

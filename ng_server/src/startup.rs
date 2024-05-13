@@ -28,7 +28,7 @@ pub struct AppState {
     // Webauthn has no mutable inner state, so Arc and read only is sufficent.
     // Alternately, you could use a reference here provided you can work out
     // lifetimes.
-    pub webauthn: Arc<Webauthn>,
+    // pub webauthn: Arc<Webauthn>,
     // This needs mutability, so does require a mutex.
     // pub users: Arc<Mutex<Data>>,
     // DB connection pool
@@ -37,20 +37,20 @@ pub struct AppState {
 
 impl AppState {
     pub fn new(pool: Pool<Sqlite>) -> Self {
-        // Effective domain name.
-        let rp_id = "localhost";
-        // Url containing the effective domain name
-        // MUST include the port number!
-        let rp_origin = Url::parse("http://localhost:8081").expect("Invalid URL");
-        let builder = WebauthnBuilder::new(rp_id, &rp_origin).expect("Invalid configuration");
-
-        // Now, with the builder you can define other options.
-        // Set a "nice" relying party name. Has no security properties and
-        // may be changed in the future.
-        let builder = builder.rp_name("Axum Webauthn-rs");
-
-        // Consume the builder and create our webauthn instance.
-        let webauthn = Arc::new(builder.build().expect("Invalid configuration"));
+        // // Effective domain name.
+        // let rp_id = "localhost";
+        // // Url containing the effective domain name
+        // // MUST include the port number!
+        // let rp_origin = Url::parse("http://localhost:8081").expect("Invalid URL");
+        // let builder = WebauthnBuilder::new(rp_id, &rp_origin).expect("Invalid configuration");
+        //
+        // // Now, with the builder you can define other options.
+        // // Set a "nice" relying party name. Has no security properties and
+        // // may be changed in the future.
+        // let builder = builder.rp_name("Axum Webauthn-rs");
+        //
+        // // Consume the builder and create our webauthn instance.
+        // let webauthn = Arc::new(builder.build().expect("Invalid configuration"));
 
         // let users = Arc::new(Mutex::new(Data {
         //     pool,
@@ -59,6 +59,6 @@ impl AppState {
         //     keys: HashMap::new(),
         // }));
 
-        AppState { webauthn, pool }
+        AppState { pool }
     }
 }
