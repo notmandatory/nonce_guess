@@ -93,7 +93,7 @@ function login() {
                     })
                         .then((response) => {
                             if (response.ok) {
-                                location.reload();
+                                //location.reload();
                                 // flash_message.innerHTML = "Successfully logged in!";
                             } else {
                                 flash_message.innerHTML = "Error whilst logging in!";

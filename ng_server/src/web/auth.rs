@@ -1,17 +1,23 @@
-use super::{auth, db, Db};
-use crate::startup::AppState;
+use super::auth;
+
+use askama::Template;
+use axum::extract::Query;
+use axum::response::Redirect;
+use axum::routing::{get, post, put};
 use axum::{
     extract::{Extension, Json, Path},
     http::StatusCode,
     response::IntoResponse,
+    Router,
 };
 use axum_login::axum::async_trait;
 use axum_login::{AuthUser, AuthnBackend, AuthzBackend, UserId};
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Sqlite};
+use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::sync::Arc;
+use axum::http::HeaderValue;
 use tower_sessions::Session;
 use tracing::{debug, error, info};
 use uuid::Uuid;
@@ -22,13 +28,42 @@ use uuid::Uuid;
  */
 
 // 1. Import the prelude - this contains everything needed for the server to function.
-use crate::auth::Error::UserAlreadyRegistered;
+use crate::db::Db;
 use crate::model::Player;
+use crate::web::auth::Error::UserAlreadyRegistered;
+use crate::{db, HomeTemplate};
 use webauthn_rs::prelude::*;
 
 const REG_STATE: &str = "reg_state";
 const AUTH_STATE: &str = "auth_state";
 pub const AUTH_UUID: &str = "auth_uuid";
+
+#[derive(Template)]
+#[template(path = "pages/login.html")]
+pub struct LoginTemplate {
+    next: Option<String>,
+}
+
+// This allows us to extract the "next" field from the query string. We use this
+// to redirect after log in.
+#[derive(Debug, Deserialize)]
+pub struct NextUrl {
+    next: Option<String>,
+}
+
+pub fn router() -> Router<SqlitePool> {
+    Router::new()
+        .route("/login", get(login))
+        .route("/register_start/:username", post(start_register))
+        .route("/register_finish", post(finish_register))
+        .route("/login_start/:username", post(start_authentication))
+        .route("/login_finish", post(finish_authentication))
+        .route("/logout", get(logout))
+}
+
+pub async fn login(Query(NextUrl { next }): Query<NextUrl>) -> LoginTemplate {
+    LoginTemplate { next }
+}
 
 // 2. The first step a client (user) will carry out is requesting a credential to be
 // registered. We need to provide a challenge for this. The work flow will be:
@@ -68,7 +103,7 @@ pub async fn start_register(
     mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Path(username): Path<String>,
-) -> Result<impl IntoResponse, Error> {
+) -> Result<impl IntoResponse, crate::error::Error> {
     info!("Start register");
     // We get the username from the URL, but you could get this via form submission or
     // some other process. In some parts of Webauthn, you could also use this as a "display name"
@@ -89,9 +124,14 @@ pub async fn start_register(
     //         .copied()
     //         .unwrap_or_else(Uuid::new_v4)
     // };
-    let mut tx = auth_session.backend.pool.begin().await.map_err(|e| Error::Unknown)?;
+    let mut tx = auth_session
+        .backend
+        .pool
+        .begin()
+        .await
+        .map_err(|e| Error::Unknown)?;
     let user_unique_id: Uuid = match tx.select_player_uuid(&username).await {
-        Ok(_uuid) => Err(UserAlreadyRegistered(username.clone())),
+        Ok(_uuid) => Err(UserAlreadyRegistered(username.clone()).into()),
         Err(db::Error::Sqlx(sqlx::Error::RowNotFound)) => Ok(Uuid::new_v4()),
         Err(e) => Err(Error::from(e)),
     }?;
@@ -100,7 +140,7 @@ pub async fn start_register(
     // .unwrap_or_else(Uuid::new_v4);
 
     // Remove any previous registrations that may have occured from the session.
-    session.remove_value("reg_state");
+    session.remove_value("reg_state").await.unwrap();
 
     // If the user has any other credentials, we exclude these here so they can't be duplicate registered.
     // It also hints to the browser that only new credentials should be "blinked" for interaction.
@@ -138,7 +178,7 @@ pub async fn start_register(
         }
         Err(e) => {
             info!("challenge_register -> {:?}", e);
-            return Err(Error::Unknown);
+            return Err(Error::Unknown.into());
         }
     };
     Ok(res)
@@ -152,24 +192,30 @@ pub async fn finish_register(
     mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Json(reg): Json<RegisterPublicKeyCredential>,
-) -> Result<impl IntoResponse, Error> {
+) -> Result<impl IntoResponse, crate::error::Error> {
     let (username, user_unique_id, reg_state) = match session.get("reg_state").await? {
         Some((username, user_unique_id, reg_state)) => (username, user_unique_id, reg_state),
         None => {
             error!("Failed to get session");
-            return Err(Error::CorruptSession);
+            return Err(Error::CorruptSession.into());
         }
     };
     dbg!((&username, &user_unique_id, &reg_state));
     session.remove_value("reg_state");
 
-    let res = match auth_session.backend
+    let res = match auth_session
+        .backend
         .webauthn
         .finish_passkey_registration(&reg, &reg_state)
     {
         Ok(sk) => {
             // let mut users_guard = app_state.users.lock().await;
-            let mut tx = auth_session.backend.pool.begin().await.map_err(|e| Error::Unknown)?;
+            let mut tx = auth_session
+                .backend
+                .pool
+                .begin()
+                .await
+                .map_err(|e| Error::Unknown)?;
 
             //TODO: This is where we would store the credential in a db, or persist them in some other way.
             // users_guard
@@ -241,17 +287,22 @@ pub async fn start_authentication(
     mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Path(username): Path<String>,
-) -> Result<impl IntoResponse, Error> {
+) -> Result<impl IntoResponse, crate::error::Error> {
     info!("Start Authentication");
     // We get the username from the URL, but you could get this via form submission or
     // some other process.
 
     // Remove any previous authentication that may have occured from the session.
-    session.remove_value("auth_state");
+    let _ = session.remove_value("auth_state").await?;
 
     // Get the set of keys that the user possesses
     // let users_guard = app_state.users.lock().await;
-    let mut tx = auth_session.backend.pool.begin().await.map_err(|e| Error::Unknown)?;
+    let mut tx = auth_session
+        .backend
+        .pool
+        .begin()
+        .await
+        .map_err(|e| Error::Unknown)?;
 
     // Look up their unique id from the username
     // let user_unique_id = users_guard
@@ -279,7 +330,8 @@ pub async fn start_authentication(
         .await
         .map_err(|e| Error::Unknown)?;
 
-    let res = match auth_session.backend
+    let res = match auth_session
+        .backend
         .webauthn
         .start_passkey_authentication(allow_credentials.as_slice())
     {
@@ -298,7 +350,7 @@ pub async fn start_authentication(
         }
         Err(e) => {
             info!("challenge_authenticate -> {:?}", e);
-            return Err(Error::Unknown);
+            return Err(crate::error::Error::Auth(Error::Unknown));
         }
     };
     Ok(res)
@@ -313,15 +365,26 @@ pub async fn finish_authentication(
     mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Json(auth): Json<PublicKeyCredential>,
-) -> Result<impl IntoResponse, Error> {
-    let (user_unique_id, auth_state): (Uuid, PasskeyAuthentication) =
-        session.get("auth_state").await?.ok_or(Error::CorruptSession)?;
+) -> Result<impl IntoResponse, crate::error::Error> {
+    let (user_unique_id, auth_state): (Uuid, PasskeyAuthentication) = session
+        .get("auth_state")
+        .await?
+        .ok_or(Error::CorruptSession)?;
 
-    session.remove_value("auth_state").await.map_err(Error::from)?;
+    session
+        .remove_value("auth_state")
+        .await
+        .map_err(Error::from)?;
 
     // TODO fix error handling
-    let player = auth_session.authenticate((auth, auth_state)).await.map_err(|e| Error::CorruptSession)?;
-    if let Some(_player) = player {
+    let player = auth_session
+        .authenticate((auth, auth_state))
+        .await
+        .map_err(|e| Error::CorruptSession)?;
+    if let Some(player) = player {
+        if auth_session.login(&player).await.is_err() {
+            return Ok(StatusCode::UNAUTHORIZED);
+        }
         Ok(StatusCode::OK)
     } else {
         Ok(StatusCode::UNAUTHORIZED)
@@ -373,6 +436,27 @@ pub async fn finish_authentication(
     // Ok(res)
 }
 
+// async fn logout(
+//     Extension(app_state): Extension<AppState>,
+//     mut auth_session: axum_login::AuthSession<Backend>,
+// ) -> impl IntoResponse {
+//     let _player = auth_session.logout().await.expect("logout");
+//     HtmlTemplate(LoginTemplate {
+//         next: None
+//     })
+// }
+
+pub async fn logout(mut auth_session: AuthSession) -> impl IntoResponse {
+    match auth_session.logout().await {
+        Ok(_) => {
+            let mut response = StatusCode::OK.into_response();
+            response.headers_mut().insert("HX-Refresh", HeaderValue::from_static("true"));
+            response
+        },
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
+}
+
 impl AuthUser for Player {
     type Id = Uuid;
 
@@ -401,7 +485,7 @@ impl Backend {
         let rp_id = "localhost";
         // Url containing the effective domain name
         // MUST include the port number!
-        let rp_origin = Url::parse("http://localhost:8081").expect("Invalid URL");
+        let rp_origin = Url::parse("http://localhost:3000").expect("Invalid URL");
         let builder = WebauthnBuilder::new(rp_id, &rp_origin).expect("Invalid configuration");
 
         // Now, with the builder you can define other options.
@@ -443,11 +527,15 @@ impl AuthnBackend for Backend {
 
         let (auth, auth_state) = creds;
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(db::Error::from)
             .map_err(Error::from)?;
 
-        let uuid = auth.get_user_unique_id()
+        let uuid = auth
+            .get_user_unique_id()
             .map(|uuid_bytes| Uuid::from_slice(uuid_bytes).expect("uuid"));
 
         if let Some(user_unique_id) = uuid {
@@ -487,7 +575,9 @@ impl AuthnBackend for Backend {
 
                     // session.insert(AUTH_UUID, &user_unique_id).await?;
                     // StatusCode::OK
-                    let player = tx.select_player_by_uuid(&user_unique_id).await
+                    let player = tx
+                        .select_player_by_uuid(&user_unique_id)
+                        .await
                         .expect("player"); // TODO fix error handling
                     info!("Authentication Successful!");
                     Ok(player)
@@ -517,8 +607,10 @@ impl AuthnBackend for Backend {
 // Permissions that can be granted to a player.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) enum Permission {
-    /// Able to change the target block height.
-    PostTargetBlock,
+    /// Add a nonce guess.
+    AddGuess,
+    /// Change the target block height.
+    ChangeTargetBlock,
 }
 
 #[async_trait]

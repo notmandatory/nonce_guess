@@ -24,7 +24,7 @@ From ng_server directory:
    RUST_LOG=debug cargo watch -- cargo run --bin ng_server
    ```
    
-By default, the data is stored in SQLite memory database. For authentication the URL must use `localhost` and not `127.0.0.1`, e.g. `http://localhost:8081`.
+By default, the data is stored in SQLite memory database. For authentication the URL must use `localhost` and not `127.0.0.1`, e.g. `http://localhost:3000`.
    
 ### Create Release Build
 
