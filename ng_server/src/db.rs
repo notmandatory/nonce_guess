@@ -1,13 +1,12 @@
-use crate::auth::Permission;
 use crate::model::{Guess, Player, Target};
+use crate::web::auth::Permission;
 use axum::async_trait;
 use sqlx::sqlite::SqliteRow;
 use sqlx::{FromRow, Row, Sqlite, Transaction};
 use std::collections::HashSet;
-use std::prelude;
 use std::str::FromStr;
 use uuid::Uuid;
-use webauthn_rs::prelude::{CredentialID, Passkey, PublicKeyCredential};
+use webauthn_rs::prelude::{CredentialID, Passkey};
 
 #[async_trait]
 pub trait Db {

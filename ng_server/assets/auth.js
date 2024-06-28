@@ -121,10 +121,12 @@ function login() {
                         })
                             .then((response) => {
                                 if (response.ok) {
-                                    location.reload();
                                     flash_message.classList.add('text-green-600');
                                     flash_message.classList.remove('hidden');
-                                    info_message.innerHTML = "Successfully logged in,";
+                                    flash_message.innerHTML = "Successfully logged in,";
+                                    const urlParams = new URLSearchParams(window.location.search);
+                                    const next = urlParams.get('next');
+                                    location.href = next || "/";
                                 } else {
                                     flash_message.classList.add('text-red-600');
                                     flash_message.classList.remove('hidden');

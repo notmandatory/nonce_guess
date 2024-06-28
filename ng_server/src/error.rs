@@ -7,12 +7,20 @@ use std::num::ParseIntError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error<T = ()> {
-    #[error("database: {0}")]
-    Db(#[from] sqlx::Error),
-    #[error("CborSer: {0}")]
+    #[error("database error: {0}")]
+    Db(#[from] crate::db::Error),
+    #[error("cbor ser error: {0}")]
     CborSer(#[from] ciborium::ser::Error<T>),
-    #[error("CborDe: {0}")]
+    #[error("cbor de error: {0}")]
     CborDe(#[from] ciborium::de::Error<T>),
+    #[error("auth error: {0}")]
+    Auth(#[from] crate::web::auth::Error),
+    #[error("session error: {0}")]
+    Session(#[from] tower_sessions::session::Error),
+    #[error("request error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+    #[error("parse guess error: {0}")]
+    ParseGuess(#[from] ParseIntError),
 }
 
 impl IntoResponse for Error {
@@ -21,6 +29,10 @@ impl IntoResponse for Error {
             Error::Db(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             Error::CborSer(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             Error::CborDe(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            Error::Auth(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            Error::Session(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            Error::Reqwest(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            Error::ParseGuess(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
 
         let body = Json(json!({
