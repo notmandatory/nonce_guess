@@ -15,6 +15,12 @@ struct HomeTemplate {
 }
 
 #[derive(Template)]
+#[template(path = "fragments/target.html")]
+struct TargetFragment {
+    target: Target,
+}
+
+#[derive(Template)]
 #[template(path = "fragments/guesses.html")]
 struct GuessesFragment {
     guesses: Vec<Guess>,
