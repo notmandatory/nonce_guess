@@ -1,5 +1,5 @@
 use crate::web::auth::{Backend, Permission};
-use crate::web::{auth, protected};
+use crate::web::{auth, protected, restricted};
 use axum::{Extension, Router};
 use axum::extract::State;
 use axum_embed::ServeEmbed;
@@ -58,7 +58,7 @@ impl App {
         let session_store = SqliteStore::new(self.pool.clone());
         session_store.migrate().await?;
 
-        // TODO addt his back in
+        // TODO add this back in
         // let deletion_task = tokio::task::spawn(
         //     session_store
         //         .clone()
@@ -84,13 +84,9 @@ impl App {
         let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
         let app =
-            // restricted::router()
-            // .route_layer(permission_required!(
-            //     Backend,
-            //     login_url = "/login",
-            //     "restricted.read",
-            // ))
             Router::new()
+                .merge(restricted::router())
+                .route_layer(permission_required!(Backend, login_url = "/login", Permission::ChangeTargetBlock))
                 .merge(protected::router())
                 .route_layer(login_required!(Backend, login_url = "/login"))
                 .merge(auth::router())

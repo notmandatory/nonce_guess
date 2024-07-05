@@ -1,5 +1,6 @@
 use askama::Template;
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
+use sqlx::SqlitePool;
 
 #[derive(Template)]
 #[template(path = "pages/admin.html")]
@@ -7,7 +8,7 @@ struct AdminTemplate<'a> {
     player_name: &'a str,
 }
 
-pub fn router() -> Router<()> {
+pub fn router() -> Router<SqlitePool> {
     Router::new().route("/admin", get(self::get::admin))
 }
 

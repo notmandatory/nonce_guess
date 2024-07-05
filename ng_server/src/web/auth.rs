@@ -607,8 +607,8 @@ impl AuthnBackend for Backend {
 // Permissions that can be granted to a player.
 #[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 pub(crate) enum Permission {
-    /// Add a nonce guess.
-    AddGuess,
+    /// Assign a player to the admin group.
+    AssignAdmin,
     /// Change the target block height.
     ChangeTargetBlock,
 }
@@ -629,6 +629,15 @@ impl AuthzBackend for Backend {
             .map_err(Error::Db)?;
 
         tx.select_permissions(&user.uuid).await.map_err(Error::from)
+    }
+
+    async fn get_group_permissions(&self, user: &Self::User) -> Result<HashSet<Self::Permission>, Self::Error> {
+        // TODO replace with logic to assign first admin
+        if user.name == "admin" {
+            return Ok([Permission::ChangeTargetBlock].into())
+        }
+        // TODO replace with db query to lookup user group permissions
+        Ok(HashSet::new())
     }
 }
 
