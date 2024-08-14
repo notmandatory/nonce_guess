@@ -200,15 +200,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 struct HtmlTemplate<T>(T);
 
-#[derive(Template, Default, Debug)]
-#[template(path = "pages/home.html")]
-struct HomeTemplate {
-    pub uuid: Option<Uuid>,
-    pub name: Option<String>,
-    pub target: Option<Target>,
-    pub guesses: Vec<Guess>,
-    pub my_guess: Option<Guess>,
-}
+// #[derive(Template, Default, Debug)]
+// #[template(path = "pages/home.html")]
+// struct HomeTemplate {
+//     pub uuid: Option<Uuid>,
+//     pub name: Option<String>,
+//     pub target: Option<Target>,
+//     pub guesses: Vec<Guess>,
+//     pub my_guess: Option<Guess>,
+// }
 
 // async fn handler(cookies: Cookies) -> String {
 //     cookies.add(Cookie::new("hello_world", "hello_world"));

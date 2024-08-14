@@ -1,14 +1,14 @@
 use crate::model::{Guess, Target};
 use askama::Template;
-use axum::{http::StatusCode, routing::get, Router};
 use axum::routing::post;
+use axum::{http::StatusCode, routing::get, Router};
 use sqlx::SqlitePool;
-use crate::error::Error;
 
 #[derive(Template)]
 #[template(path = "pages/home.html")]
-struct HomeTemplate {
+pub struct HomeTemplate {
     player_name: String,
+    change_target: bool,
     target: Option<Target>,
     my_guess: Option<String>,
     guesses: Vec<Guess>,
@@ -33,22 +33,32 @@ pub fn router() -> Router<SqlitePool> {
 }
 
 mod get {
-    use std::sync::Arc;
-    use axum::extract::State;
     use super::*;
-    use crate::web::auth::AuthSession;
-    use axum::response::IntoResponse;
-    use sqlx::sqlite::SqlitePool;
-    use tracing::debug;
     use crate::db::Db;
     use crate::error::Error;
     use crate::model::Block;
+    use crate::web::auth::{AuthSession, Permission};
+    use axum::extract::State;
+    use axum::response::IntoResponse;
+    use axum_login::AuthzBackend;
+    use sqlx::sqlite::SqlitePool;
+    use std::fs::Permissions;
+    use std::sync::Arc;
+    use tracing::debug;
 
-    pub async fn home(auth_session: AuthSession, State(pool): State<SqlitePool>) -> impl IntoResponse {
+    pub async fn home(
+        auth_session: AuthSession,
+        State(pool): State<SqlitePool>,
+    ) -> impl IntoResponse {
         debug!("auth_session: {:?}", &auth_session);
         match auth_session.user {
             Some(player) => {
-                let player_name = player.name;
+                let player_name = (&player.name).clone();
+                let change_target = auth_session
+                    .backend
+                    .has_perm(&player, Permission::ChangeTargetBlock)
+                    .await
+                    .unwrap(); // TODO map error
                 let uuid = player.uuid;
                 let mut tx = pool.begin().await.expect("tx");
                 let target = tx.select_current_target().await.ok();
@@ -56,7 +66,8 @@ mod get {
                     tx.select_block_guesses(some_target.block).await.ok()
                 } else {
                     tx.select_guesses().await.ok()
-                }.unwrap_or_default();
+                }
+                .unwrap_or_default();
                 let my_guess: Option<String> = guesses
                     .iter()
                     .find(|g| g.uuid == uuid)
@@ -64,10 +75,12 @@ mod get {
 
                 HomeTemplate {
                     player_name,
+                    change_target,
                     target,
                     my_guess,
                     guesses,
-                }.into_response()
+                }
+                .into_response()
             }
             None => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
@@ -105,20 +118,20 @@ mod get {
 }
 
 mod post {
-    use std::sync::Arc;
-    use axum::extract::State;
-    use axum::Form;
     use super::*;
-    use crate::web::auth::AuthSession;
-    use axum::response::IntoResponse;
-    use serde::Deserialize;
-    use sqlx::sqlite::SqlitePool;
-    use tracing::{debug, info};
-    use webauthn_rs::prelude::WebauthnError::UserNotPresent;
     use crate::db::Db;
     use crate::error::Error;
     use crate::model::Block;
     use crate::web::auth;
+    use crate::web::auth::AuthSession;
+    use axum::extract::State;
+    use axum::response::IntoResponse;
+    use axum::Form;
+    use serde::Deserialize;
+    use sqlx::sqlite::SqlitePool;
+    use std::sync::Arc;
+    use tracing::{debug, info};
+    use webauthn_rs::prelude::WebauthnError::UserNotPresent;
 
     #[derive(Deserialize)]
     pub struct GuessForm {
@@ -155,7 +168,7 @@ mod post {
                 } else {
                     tx.select_guesses().await.ok()
                 }
-                    .unwrap_or_default();
+                .unwrap_or_default();
 
                 let my_guess = Some(Guess {
                     uuid,
@@ -166,8 +179,9 @@ mod post {
 
                 Ok(HomeTemplate {
                     player_name: player_name.unwrap(),
+                    change_target: false,
                     target,
-                    my_guess: Some(guess),
+                    my_guess: my_guess.map(|g| g.name),
                     guesses,
                 })
             }
