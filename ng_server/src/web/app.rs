@@ -1,7 +1,7 @@
 use crate::web::auth::{Backend, Permission};
 use crate::web::{auth, protected, restricted};
-use axum::{Extension, Router};
 use axum::extract::State;
+use axum::{Extension, Router};
 use axum_embed::ServeEmbed;
 use axum_login::{
     login_required, permission_required,
@@ -83,16 +83,15 @@ impl App {
         let backend = Backend::new(self.pool.clone());
         let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
-        let app =
-            Router::new()
-                .merge(restricted::router())
-                .route_layer(permission_required!(Backend, login_url = "/login", Permission::ChangeTargetBlock))
-                .merge(protected::router())
-                .route_layer(login_required!(Backend, login_url = "/login"))
-                .merge(auth::router())
-                .layer(auth_layer)
-                .with_state(self.pool)
-                .nest_service("/assets", serve_assets);
+        let app = Router::new()
+            .merge(restricted::router())
+            //.route_layer(permission_required!(Backend, login_url = "/login", Permission::ChangeTargetBlock))
+            .merge(protected::router())
+            .route_layer(login_required!(Backend, login_url = "/login"))
+            .merge(auth::router())
+            .layer(auth_layer)
+            .with_state(self.pool)
+            .nest_service("/assets", serve_assets);
 
         let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
 

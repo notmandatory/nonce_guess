@@ -2,6 +2,7 @@ use super::auth;
 
 use askama::Template;
 use axum::extract::Query;
+use axum::http::HeaderValue;
 use axum::response::Redirect;
 use axum::routing::{get, post, put};
 use axum::{
@@ -17,7 +18,6 @@ use sqlx::{Pool, Row, Sqlite, SqlitePool};
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::sync::Arc;
-use axum::http::HeaderValue;
 use tower_sessions::Session;
 use tracing::{debug, error, info};
 use uuid::Uuid;
@@ -28,10 +28,10 @@ use uuid::Uuid;
  */
 
 // 1. Import the prelude - this contains everything needed for the server to function.
+use crate::db;
 use crate::db::Db;
 use crate::model::Player;
 use crate::web::auth::Error::UserAlreadyRegistered;
-use crate::{db, HomeTemplate};
 use webauthn_rs::prelude::*;
 
 const REG_STATE: &str = "reg_state";
@@ -450,9 +450,11 @@ pub async fn logout(mut auth_session: AuthSession) -> impl IntoResponse {
     match auth_session.logout().await {
         Ok(_) => {
             let mut response = StatusCode::OK.into_response();
-            response.headers_mut().insert("HX-Refresh", HeaderValue::from_static("true"));
             response
-        },
+                .headers_mut()
+                .insert("HX-Refresh", HeaderValue::from_static("true"));
+            response
+        }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     }
 }
@@ -631,10 +633,13 @@ impl AuthzBackend for Backend {
         tx.select_permissions(&user.uuid).await.map_err(Error::from)
     }
 
-    async fn get_group_permissions(&self, user: &Self::User) -> Result<HashSet<Self::Permission>, Self::Error> {
+    async fn get_group_permissions(
+        &self,
+        user: &Self::User,
+    ) -> Result<HashSet<Self::Permission>, Self::Error> {
         // TODO replace with logic to assign first admin
         if user.name == "admin" {
-            return Ok([Permission::ChangeTargetBlock].into())
+            return Ok([Permission::AssignAdmin, Permission::ChangeTargetBlock].into());
         }
         // TODO replace with db query to lookup user group permissions
         Ok(HashSet::new())
