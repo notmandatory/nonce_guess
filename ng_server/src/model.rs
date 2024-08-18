@@ -1,11 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
 
 pub use serde;
-pub use serde_json;
-pub use serde_with;
 use uuid::Uuid;
-use webauthn_rs::prelude::{CredentialID, Passkey};
+use webauthn_rs::prelude::Passkey;
 
 /// The players login information
 #[derive(Debug, Clone)]

@@ -1,30 +1,7 @@
-use crate::model::{Guess, Target};
-use askama::Template;
+use crate::model::Guess;
 use axum::routing::post;
 use axum::{http::StatusCode, routing::get, Router};
 use sqlx::SqlitePool;
-
-#[derive(Template)]
-#[template(path = "pages/home.html")]
-pub struct HomeTemplate {
-    player_name: String,
-    change_target: bool,
-    target: Option<Target>,
-    my_guess: Option<String>,
-    guesses: Vec<Guess>,
-}
-
-#[derive(Template)]
-#[template(path = "fragments/target.html")]
-struct TargetFragment {
-    target: Target,
-}
-
-#[derive(Template)]
-#[template(path = "fragments/guesses.html")]
-struct GuessesFragment {
-    guesses: Vec<Guess>,
-}
 
 pub fn router() -> Router<SqlitePool> {
     Router::new()
@@ -38,12 +15,11 @@ mod get {
     use crate::error::Error;
     use crate::model::Block;
     use crate::web::auth::{AuthSession, Permission};
+    use crate::web::template::home::home_page;
     use axum::extract::State;
     use axum::response::IntoResponse;
     use axum_login::AuthzBackend;
     use sqlx::sqlite::SqlitePool;
-    use std::fs::Permissions;
-    use std::sync::Arc;
     use tracing::debug;
 
     pub async fn home(
@@ -53,7 +29,6 @@ mod get {
         debug!("auth_session: {:?}", &auth_session);
         match auth_session.user {
             Some(player) => {
-                let player_name = (&player.name).clone();
                 let change_target = auth_session
                     .backend
                     .has_perm(&player, Permission::ChangeTargetBlock)
@@ -73,14 +48,7 @@ mod get {
                     .find(|g| g.uuid == uuid)
                     .map(|guess| guess.clone().name);
 
-                HomeTemplate {
-                    player_name,
-                    change_target,
-                    target,
-                    my_guess,
-                    guesses,
-                }
-                .into_response()
+                home_page(target, change_target, my_guess, guesses).into_response()
             }
             None => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
@@ -119,19 +87,16 @@ mod get {
 
 mod post {
     use super::*;
-    use crate::db::Db;
     use crate::error::Error;
-    use crate::model::Block;
     use crate::web::auth;
     use crate::web::auth::AuthSession;
+    use crate::{db::Db, web::template};
     use axum::extract::State;
     use axum::response::IntoResponse;
     use axum::Form;
     use serde::Deserialize;
     use sqlx::sqlite::SqlitePool;
-    use std::sync::Arc;
-    use tracing::{debug, info};
-    use webauthn_rs::prelude::WebauthnError::UserNotPresent;
+    use tracing::info;
 
     #[derive(Deserialize)]
     pub struct GuessForm {
@@ -177,13 +142,10 @@ mod post {
                     nonce,
                 });
 
-                Ok(HomeTemplate {
-                    player_name: player_name.unwrap(),
-                    change_target: false,
-                    target,
-                    my_guess: my_guess.map(|g| g.name),
-                    guesses,
-                })
+                Ok(
+                    template::home::home_page(target, false, my_guess.map(|g| g.name), guesses)
+                        .into_response(),
+                )
             }
             None => Err(Error::Auth(auth::Error::Unknown)),
         }

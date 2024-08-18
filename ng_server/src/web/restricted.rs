@@ -1,15 +1,8 @@
-use askama::Template;
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Router};
 use axum_login::permission_required;
 use sqlx::SqlitePool;
 
 use crate::web::auth::{Backend, Permission};
-
-#[derive(Template)]
-#[template(path = "pages/admin.html")]
-struct AdminTemplate<'a> {
-    player_name: &'a str,
-}
 
 pub fn router() -> Router<SqlitePool> {
     Router::new()
