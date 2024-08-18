@@ -1,22 +1,19 @@
-use super::auth;
-
-use askama::Template;
+use super::template::login::login_page;
 use axum::extract::Query;
 use axum::http::HeaderValue;
-use axum::response::Redirect;
-use axum::routing::{get, post, put};
+use axum::routing::{get, post};
 use axum::{
-    extract::{Extension, Json, Path},
+    extract::{Json, Path},
     http::StatusCode,
     response::IntoResponse,
     Router,
 };
 use axum_login::axum::async_trait;
 use axum_login::{AuthUser, AuthnBackend, AuthzBackend, UserId};
+use maud::Markup;
 use serde::{Deserialize, Serialize};
-use sqlx::{Pool, Row, Sqlite, SqlitePool};
+use sqlx::{Pool, Sqlite, SqlitePool};
 use std::collections::HashSet;
-use std::ops::Deref;
 use std::sync::Arc;
 use tower_sessions::Session;
 use tracing::{debug, error, info};
@@ -33,16 +30,6 @@ use crate::db::Db;
 use crate::model::Player;
 use crate::web::auth::Error::UserAlreadyRegistered;
 use webauthn_rs::prelude::*;
-
-const REG_STATE: &str = "reg_state";
-const AUTH_STATE: &str = "auth_state";
-pub const AUTH_UUID: &str = "auth_uuid";
-
-#[derive(Template)]
-#[template(path = "pages/login.html")]
-pub struct LoginTemplate {
-    next: Option<String>,
-}
 
 // This allows us to extract the "next" field from the query string. We use this
 // to redirect after log in.
@@ -61,8 +48,8 @@ pub fn router() -> Router<SqlitePool> {
         .route("/logout", get(logout))
 }
 
-pub async fn login(Query(NextUrl { next }): Query<NextUrl>) -> LoginTemplate {
-    LoginTemplate { next }
+pub async fn login(Query(NextUrl { next }): Query<NextUrl>) -> Markup {
+    login_page(next)
 }
 
 // 2. The first step a client (user) will carry out is requesting a credential to be
@@ -100,7 +87,7 @@ pub async fn login(Query(NextUrl { next }): Query<NextUrl>) -> LoginTemplate {
 // the challenge to the browser.
 
 pub async fn start_register(
-    mut auth_session: axum_login::AuthSession<Backend>,
+    auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Path(username): Path<String>,
 ) -> Result<impl IntoResponse, crate::error::Error> {
@@ -129,7 +116,7 @@ pub async fn start_register(
         .pool
         .begin()
         .await
-        .map_err(|e| Error::Unknown)?;
+        .map_err(|_| Error::Unknown)?;
     let user_unique_id: Uuid = match tx.select_player_uuid(&username).await {
         Ok(_uuid) => Err(UserAlreadyRegistered(username.clone()).into()),
         Err(db::Error::Sqlx(sqlx::Error::RowNotFound)) => Ok(Uuid::new_v4()),
@@ -155,7 +142,7 @@ pub async fn start_register(
     let exclude_credentials = tx
         .select_player_passkeys(&user_unique_id)
         .await
-        .map_err(|e| Error::Unknown)
+        .map_err(|_| Error::Unknown)
         .map(|keys| keys.iter().map(|sk| sk.cred_id().clone()).collect())
         .ok();
 
@@ -189,7 +176,7 @@ pub async fn start_register(
 // to verify these and persist them.
 
 pub async fn finish_register(
-    mut auth_session: axum_login::AuthSession<Backend>,
+    auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Json(reg): Json<RegisterPublicKeyCredential>,
 ) -> Result<impl IntoResponse, crate::error::Error> {
@@ -225,7 +212,7 @@ pub async fn finish_register(
             //     .or_insert_with(|| vec![sk.clone()]);
             tx.insert_player(&username, &user_unique_id)
                 .await
-                .map_err(|e| Error::Unknown)?;
+                .map_err(|_| Error::Unknown)?;
             tx.insert_player_passkey(&user_unique_id, &sk)
                 .await
                 .map_err(|e| {
@@ -284,7 +271,7 @@ pub async fn finish_register(
 // The user indicates the wish to start authentication and we need to provide a challenge.
 
 pub async fn start_authentication(
-    mut auth_session: axum_login::AuthSession<Backend>,
+    auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Path(username): Path<String>,
 ) -> Result<impl IntoResponse, crate::error::Error> {
@@ -328,7 +315,7 @@ pub async fn start_authentication(
     let allow_credentials = tx
         .select_player_passkeys(&user_unique_id)
         .await
-        .map_err(|e| Error::Unknown)?;
+        .map_err(|_| Error::Unknown)?;
 
     let res = match auth_session
         .backend
@@ -366,7 +353,7 @@ pub async fn finish_authentication(
     session: Session,
     Json(auth): Json<PublicKeyCredential>,
 ) -> Result<impl IntoResponse, crate::error::Error> {
-    let (user_unique_id, auth_state): (Uuid, PasskeyAuthentication) = session
+    let (_user_unique_id, auth_state): (Uuid, PasskeyAuthentication) = session
         .get("auth_state")
         .await?
         .ok_or(Error::CorruptSession)?;
@@ -380,7 +367,7 @@ pub async fn finish_authentication(
     let player = auth_session
         .authenticate((auth, auth_state))
         .await
-        .map_err(|e| Error::CorruptSession)?;
+        .map_err(|_| Error::CorruptSession)?;
     if let Some(player) = player {
         if auth_session.login(&player).await.is_err() {
             return Ok(StatusCode::UNAUTHORIZED);
@@ -662,6 +649,4 @@ pub enum Error {
     InvalidSessionState(#[from] tower_sessions::session::Error),
     #[error("db: {0}")]
     Db(#[from] db::Error),
-    #[error("invalid input")]
-    InvalidInput,
 }
