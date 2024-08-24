@@ -7,35 +7,28 @@
 
 ### Local Testing
 
-Install:
+Required Tools:
 
-pnpm
-cargo-watch
+1. [tailwindcss](https://github.com/tailwindlabs/tailwindcss)
 
-From ng_server directory:
+Build and Run:
 
-1. Create tailwind css file and watch for changes
+1. Start the server, it will also serve the latest web client
    ```shell
-   pnpm dlx tailwindcss -i ./styles/tailwind.css -o ./assets/main.css --watch
-   ```
+   RUST_LOG=debug cargo -- cargo run
 
-2. Start the api server, it will also serve the latest web client
-   ```shell
-   RUST_LOG=debug cargo watch -- cargo run --bin ng_server
-   ```
-   
 By default, the data is stored in SQLite memory database. For authentication the URL must use `localhost` and not `127.0.0.1`, e.g. `http://localhost:3000`.
-   
+
 ### Create Release Build
 
-1. Build the api server binary, this will include the web artifacts
+1. Build the server binary, this will include the web artifacts
    ```shell
-   cargo build --bin ng_server --release
+   cargo build --release
    ```
 
 To run the resulting self contained binary use `RUST_LOG=debug target/release/ng_server`.
 
-In test or release mode the web client can be found at: http://localhost:8081/
+In test or release mode the web client can be found at: http://localhost:3000/
 
 ### Build Docker Container
 
@@ -44,4 +37,3 @@ In test or release mode the web client can be found at: http://localhost:8081/
 3. Visit http://localhost:8081/ in a browser
 
 Note: above steps also work with `podman` instead of `docker`.
-
