@@ -188,7 +188,7 @@ pub async fn finish_register(
         }
     };
     dbg!((&username, &user_unique_id, &reg_state));
-    session.remove_value("reg_state");
+    session.remove_value("reg_state").await?;
 
     let res = match auth_session
         .backend
@@ -202,7 +202,7 @@ pub async fn finish_register(
                 .pool
                 .begin()
                 .await
-                .map_err(|e| Error::Unknown)?;
+                .map_err(|_| Error::Unknown)?;
 
             //TODO: This is where we would store the credential in a db, or persist them in some other way.
             // users_guard
@@ -289,7 +289,7 @@ pub async fn start_authentication(
         .pool
         .begin()
         .await
-        .map_err(|e| Error::Unknown)?;
+        .map_err(|_| Error::Unknown)?;
 
     // Look up their unique id from the username
     // let user_unique_id = users_guard
