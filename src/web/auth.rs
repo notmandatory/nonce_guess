@@ -625,11 +625,19 @@ impl AuthzBackend for Backend {
         user: &Self::User,
     ) -> Result<HashSet<Self::Permission>, Self::Error> {
         // TODO replace with logic to assign first admin
-        if user.name == "admin" {
-            return Ok([Permission::AssignAdmin, Permission::ChangeTargetBlock].into());
-        }
-        // TODO replace with db query to lookup user group permissions
-        Ok(HashSet::new())
+        // if user.name == "admin" {
+        //     return Ok([Permission::AssignAdmin, Permission::ChangeTargetBlock].into());
+        // }
+        // // TODO replace with db query to lookup user group permissions
+        // Ok(HashSet::new())
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(db::Error::Sqlx)
+            .map_err(Error::Db)?;
+
+        tx.select_permissions(&user.uuid).await.map_err(Error::from)
     }
 }
 
