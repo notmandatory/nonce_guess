@@ -212,19 +212,15 @@ impl<'c> Db for Transaction<'c, Sqlite> {
     }
 
     async fn select_permissions(&mut self, uuid: &Uuid) -> Result<HashSet<Permission>, Error> {
-        let query = sqlx::query::<Sqlite>("SELECT permission FROM authz WHERE uuid IS ?")
-            .bind(uuid.to_string());
+        let query =
+            sqlx::query_as::<Sqlite, Permission>("SELECT permission FROM authz WHERE uuid IS ?")
+                .bind(uuid.to_string());
 
         query
             .fetch_all(&mut **self)
             .await
-            .map_err(Error::from)
-            .and_then(|rows| {
-                rows.into_iter()
-                    .map(|row| row.get::<String, usize>(0))
-                    .map(|json| serde_json::from_str(json.as_str()).map_err(Error::from))
-                    .collect()
-            })
+            .map_err(|err| err.into())
+            .map(|pv| pv.into_iter().collect())
         // serde_json::to_string(keychain).expect("keychain json")
     }
 
@@ -279,7 +275,7 @@ impl<'c> Db for Transaction<'c, Sqlite> {
 
     async fn select_block_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error> {
         let query = sqlx::query_as::<Sqlite, GuessRow>(
-            "SELECT uuid, name, block, nonce FROM guess \
+            "SELECT guess.uuid, name, block, nonce FROM guess \
                  INNER JOIN player ON player.uuid = guess.uuid \
                  WHERE block IS ? \
                  ORDER BY nonce",
@@ -307,7 +303,12 @@ impl<'c> Db for Transaction<'c, Sqlite> {
     }
 
     async fn set_guesses_block(&mut self, block: u32) -> Result<(), Error> {
-        let query = sqlx::query("UPDATE guess set block = ? WHERE block IS null").bind(block);
+        let query = sqlx::query(
+            "UPDATE guess set block = ? \
+            WHERE block IS null \
+            OR block IN (SELECT block FROM target WHERE nonce IS NULL)",
+        )
+        .bind(block);
         query
             .execute(&mut **self)
             .await
@@ -340,6 +341,19 @@ impl FromRow<'_, SqliteRow> for GuessRow {
             block,
             nonce,
         }))
+    }
+}
+
+impl FromRow<'_, SqliteRow> for Permission {
+    fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
+        let permission_string = row.get::<&str, usize>(0);
+        match permission_string {
+            "AssignAdmin" => Ok(Permission::AssignAdmin),
+            "ChangeTargetBlock" => Ok(Permission::ChangeTargetBlock),
+            invalid => Err(sqlx::Error::Decode(Box::<super::error::Error>::new(
+                super::error::Error::InvalidPermission(invalid.to_string()),
+            ))),
+        }
     }
 }
 

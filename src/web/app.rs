@@ -1,9 +1,9 @@
-use crate::web::auth;
 use crate::web::auth::Backend;
+use crate::web::auth::{self, Permission};
 use axum::Router;
 use axum_embed::ServeEmbed;
 use axum_login::{
-    login_required,
+    login_required, permission_required,
     tower_sessions::{Expiry, SessionManagerLayer},
     AuthManagerLayerBuilder,
 };
@@ -16,7 +16,7 @@ use tower_cookies::cookie::SameSite;
 use tower_sessions::cookie::Key;
 use tower_sessions_sqlx_store::SqliteStore;
 
-use super::protected;
+use super::{protected, restricted};
 
 #[derive(RustEmbed, Clone)]
 #[folder = "./assets"]
@@ -84,8 +84,8 @@ impl App {
         let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
         let app = Router::new()
-            // .merge(restricted::router())
-            // //.route_layer(permission_required!(Backend, login_url = "/login", Permission::ChangeTargetBlock))
+            .merge(restricted::router())
+            .route_layer(permission_required!(Backend, Permission::ChangeTargetBlock))
             .merge(protected::router())
             .route_layer(login_required!(Backend, login_url = "/login"))
             .merge(auth::router())

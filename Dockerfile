@@ -3,8 +3,7 @@ FROM docker.io/library/rust:1.67 as builder
 WORKDIR /usr/src/nonce_guess
 COPY . .
 
-RUN rustup target add wasm32-unknown-unknown && cargo install trunk
-RUN trunk build --release ng_web/index.html && cargo build --bin ng_server --release
+RUN trunk build --release
 
 FROM docker.io/library/debian:11
 

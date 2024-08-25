@@ -6,45 +6,48 @@ use crate::model::{Guess, Target};
 pub fn home_page(
     target: Option<Target>,
     change_target: bool,
-    my_guess: Option<String>,
+    my_guess: Option<u32>,
     guesses: Vec<Guess>,
 ) -> Markup {
     let content = html! {
-        div ."antialiased"."text-gray-900"."px-6" {
-          div ."max-w-xl"."mx-auto"."py-6"."md:max-w-4xl" {
-            div ."py-6" {
-              h1 ."text-4xl"."font-bold" {
-                img src="../assets/apple-touch-icon.png" width="75" height="75";
-                br;
-                "Guess the Block Nonce"
-              }
+        div .flex."min-h-full"."flex-col"."justify-center"."px-6"."py-12"."lg:px-8" {
+            div ."sm:mx-auto"."sm:w-full"."py-6"."md:max-w-4xl" {
+                div ."py-6" {
+                    h1 ."text-4xl"."font-bold" {
+                        img src="../assets/apple-touch-icon.png" width="75" height="75";
+                        br;
+                        "Guess the Block Nonce"
+                    }
+                }
             }
-          }
-        }
 
-        @if let Some(target) = target {
-            (target_div(target))
-        } @else if change_target {
-            p "change target!";
-        }
 
-        @if my_guess.is_none() {
-            (add_guess_div())
-        }
-
-        (guesses_div(guesses))
-
-        div ."max-w-xl"."mx-auto"."py-6"."divide-y"."md:max-w-4xl" {
-          div "mt-8"."gap-6" {
-            button
-              type="submit"
-              hx-get="/logout"
-              hx-push-url="/"
-                  ."rounded-md"."bg-indigo-600"."px-2.5"."py-1.5"."text-base"."font-semibold"."text-white"."shadow-sm"."hover:bg-indigo-500"."focus-visible:outline"."focus-visible:outline-2"."focus-visible:outline-offset-2"."focus-visible:outline-indigo-600"
-            {
-              "Logout"
+            @if change_target {
+                (change_target_div())
             }
-          }
+
+            @if let Some(target) = target {
+                (target_div(target))
+            }
+
+            @if my_guess.is_none() && !change_target  {
+                (add_guess_div())
+            }
+
+            (guesses_div(guesses))
+
+            div ."sm:mx-auto"."sm:w-full"."py-6"."divide-y"."md:max-w-4xl" {
+                div "mt-8"."gap-6" {
+                    button
+                    type="submit"
+                    hx-get="/logout"
+                    hx-push-url="/"
+                        ."rounded-md"."bg-indigo-600"."px-2.5"."py-1.5"."text-base"."font-semibold"."text-white"."shadow-sm"."hover:bg-indigo-500"."focus-visible:outline"."focus-visible:outline-2"."focus-visible:outline-offset-2"."focus-visible:outline-indigo-600"
+                    {
+                    "Logout"
+                    }
+                }
+            }
         }
     };
     base("Nonce Guess".to_string(), None, content)
@@ -52,7 +55,7 @@ pub fn home_page(
 
 fn guesses_div(guesses: Vec<Guess>) -> Markup {
     html! {
-        div ."max-w-xl"."mx-auto"."py-6"."divide-y"."md:max-w-4xl" {
+        div ."sm:mx-auto"."sm:w-full"."py-6"."divide-y"."md:max-w-4xl" {
             div ."sm:flex"."sm:items-center" {
                 div ."sm:flex-auto" {
                     h2 ."text-lg"."font-semibold"."leading-6"."text-gray-900" "Current Guesses";
@@ -113,7 +116,7 @@ fn guesses_div(guesses: Vec<Guess>) -> Markup {
 
 fn add_guess_div() -> Markup {
     html! {
-        div ."max-w-xl"."mx-auto"."py-6"."divide-y"."md:max-w-4xl" {
+        div ."sm:mx-auto"."sm:w-full"."py-6"."divide-y"."md:max-w-4xl" {
             div ."sm:flex"."sm:items-center" {
                 div ."sm:flex-auto" {
                     h2 ."text-lg"."font-semibold"."leading-6"."text-gray-900" { "Nonce Guess" }
@@ -168,17 +171,60 @@ fn add_guess_div() -> Markup {
     }
 }
 
+fn change_target_div() -> Markup {
+    html! {
+        div ."sm:mx-auto"."sm:w-full"."py-6"."divide-y"."md:max-w-4xl" {
+            div ."sm:flex"."sm:items-center" {
+                div ."sm:flex-auto" {
+                    h2 ."text-lg"."font-semibold"."text-gray-900" { "Change Target Block" }
+                }
+            }
+            div ."mt-6"."flow-root" {
+                div ."overflow-hidden"."shadow"."ring-1"."ring-black"."ring-opacity-5"."sm:rounded-lg" {
+                    div ."bg-white"."shadow-lg"."sm:rounded-lg" {
+                        div ."px-4"."sm:p-6" {
+                            div ."sm:flex"."sm:items-start"."sm:justify-between" {
+                                form novalidate ."group" autocomplete="off" {
+                                    input type="text" name="block" #"block"
+                                           required
+                                           pattern="[0-9]{6}"
+                                               ."block"."w-full"."rounded-md"."py-1.5"."text-gray-900"."shadow-sm"."ring-1"."ring-inset"."ring-gray-300"."placeholder:text-gray-400"."focus:ring-2"."focus:ring-inset"."focus:ring-indigo-600"."sm:text-base"."sm:leading-6"."peer"."invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+                                           placeholder=" ";
+                                    div ."hidden"."py-1.5"."leading-6"."gap-6"."text-red-600"."font-semibold"."peer-[&:not(:placeholder-shown):not(:focus):invalid]:block" {
+                                        p #"error_message" {
+                                            "Must be valid block number."
+                                        }
+                                    }
+                                    div ."py-1.5" {
+                                        button type="button"
+                                                hx-post="/target"
+                                                hx-target="body"
+                                                hx-target-5xx="#error_message"
+                                                ."inline-flex"."py-1.5"."items-center"."rounded-md"."bg-indigo-600"."px-3"."py-2"."text-base"."font-semibold"."text-white"."shadow-sm"."hover:bg-indigo-500"."focus-visible:outline"."focus-visible:outline-2"."focus-visible:outline-offset-2"."focus-visible:outline-indigo-500"."group-invalid:pointer-events-none"."group-invalid:opacity-30"{
+                                            "Set Block"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn target_div(target: Target) -> Markup {
     html! {
-        div class="max-w-xl mx-auto py-6 divide-y md:max-w-4xl" {
+        div ."sm:mx-auto"."sm:w-full"."py-6"."divide-y"."md:max-w-4xl" {
             div ."sm:flex"."sm:items-center" {
                 div ."sm:flex-auto" {
                     h2 ."text-lg"."font-semibold"."leading-6"."text-gray-900" { "Target" }
                 }
             }
 
-            div ."mt-6"."flow-root" {
-                div ."-mx-4"."-my-2"."overflow-x-auto"."sm:-mx-6"."lg:-mx-8" {
+            div {
+                div {
                     div ."inline-block"."min-w-full"."py-2"."align-middle"."sm:px-6"."lg:px-8" {
                         div ."overflow-hidden"."shadow"."ring-1"."ring-black"."ring-opacity-5"."sm:rounded-lg" {
                             table ."min-w-full"."divide-y"."divide-gray-300" {

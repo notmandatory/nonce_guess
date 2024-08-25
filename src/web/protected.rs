@@ -26,7 +26,7 @@ mod get {
         auth_session: AuthSession,
         State(pool): State<SqlitePool>,
     ) -> impl IntoResponse {
-        debug!("auth_session: {:?}", &auth_session);
+        //debug!("auth_session: {:?}", &auth_session);
         match auth_session.user {
             Some(player) => {
                 let change_target = auth_session
@@ -43,10 +43,10 @@ mod get {
                     tx.select_guesses().await.ok()
                 }
                 .unwrap_or_default();
-                let my_guess: Option<String> = guesses
+                let my_guess: Option<u32> = guesses
                     .iter()
                     .find(|g| g.uuid == uuid)
-                    .map(|guess| guess.clone().name);
+                    .map(|guess| guess.nonce);
 
                 home_page(target, change_target, my_guess, guesses).into_response()
             }
@@ -88,12 +88,14 @@ mod get {
 mod post {
     use super::*;
     use crate::error::Error;
-    use crate::web::auth;
+    use crate::model::Target;
     use crate::web::auth::AuthSession;
+    use crate::web::auth::{self, Permission};
     use crate::{db::Db, web::template};
     use axum::extract::State;
     use axum::response::IntoResponse;
     use axum::Form;
+    use axum_login::AuthzBackend;
     use serde::Deserialize;
     use sqlx::sqlite::SqlitePool;
     use tracing::info;
@@ -113,6 +115,11 @@ mod post {
         match auth_session.user {
             Some(player) => {
                 info!("Current player: {:?}", player);
+                let change_target = auth_session
+                    .backend
+                    .has_perm(&player, Permission::ChangeTargetBlock)
+                    .await
+                    .unwrap();
 
                 let uuid = player.uuid;
                 let mut tx = pool.begin().await.expect("tx");
@@ -142,10 +149,13 @@ mod post {
                     nonce,
                 });
 
-                Ok(
-                    template::home::home_page(target, false, my_guess.map(|g| g.name), guesses)
-                        .into_response(),
+                Ok(template::home::home_page(
+                    target,
+                    change_target,
+                    my_guess.map(|g| g.nonce),
+                    guesses,
                 )
+                .into_response())
             }
             None => Err(Error::Auth(auth::Error::Unknown)),
         }

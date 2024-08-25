@@ -26,8 +26,8 @@ struct CliArgs {
     /// Address this server should listen on, defaults to "localhost:8081"
     #[arg(short, long, value_name = "HOST:PORT")]
     listen_address: Option<String>,
-    #[arg(short, long, value_name = "DB_URL", env = "NG_DB_URL")]
-    /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.sqlite", defaults to in-memory DB
+    #[arg(short, long, value_name = "DB_URL", env = "NONCE_GUESS_DB_URL")]
+    /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.sqlite?mode=rwc", defaults to in-memory DB
     database_url: Option<String>,
 }
 
@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .try_init()?;
 
-    // TODO is "?mode=rwc" required?
+    // TODO is "?mode=rwc" required? Yes
     // get database URL from env
     let database_url = std::env::var("NONCE_GUESS_DB_URL").ok();
     debug!("database_url: {:?}", &database_url);
