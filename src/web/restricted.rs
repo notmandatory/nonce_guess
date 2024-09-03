@@ -6,7 +6,7 @@ use crate::web::auth::{Backend, Permission};
 
 pub fn router() -> Router<SqlitePool> {
     Router::new().route("/target", post(self::post::target))
-    //.route_layer(permission_required!(Backend, Permission::ChangeTargetBlock))
+    .route_layer(permission_required!(Backend, Permission::ChangeTargetBlock))
 }
 
 mod post {

@@ -1,0 +1,5 @@
+build:
+    tailwindcss -c tailwind.config.js -i src/input.css -o build/css/style.css
+
+watch:
+    tailwindcss -c tailwind.config.js -i src/input.css -o build/css/style.css --watch

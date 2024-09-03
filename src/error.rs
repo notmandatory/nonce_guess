@@ -23,6 +23,8 @@ pub enum Error<T = ()> {
     ParseGuess(#[from] ParseIntError),
     #[error("invalid permission error: {0}")]
     InvalidPermission(String),
+    #[error("invalid role error: {0}")]
+    InvalidRole(String),
 }
 
 impl IntoResponse for Error {
@@ -36,6 +38,7 @@ impl IntoResponse for Error {
             Error::Reqwest(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             Error::ParseGuess(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
             Error::InvalidPermission(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            Error::InvalidRole(e) => (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
         };
 
         let body = Json(json!({

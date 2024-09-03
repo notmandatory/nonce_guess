@@ -1,5 +1,5 @@
 use crate::model::{Guess, Player, Target};
-use crate::web::auth::Permission;
+use crate::web::auth::{Permission, Role};
 use axum::async_trait;
 use sqlx::sqlite::SqliteRow;
 use sqlx::{FromRow, Row, Sqlite, Transaction};
@@ -10,6 +10,9 @@ use webauthn_rs::prelude::{CredentialID, Passkey};
 
 #[async_trait]
 pub trait Db {
+    /// Select if any player exist in the system.
+    async fn select_exists_player(&mut self) -> Result<bool, Error>;
+
     /// Insert new player.
     async fn insert_player(&mut self, name: &String, uuid: &Uuid) -> Result<(), Error>;
 
@@ -34,7 +37,7 @@ pub trait Db {
     /// Select player passkeys.
     async fn select_player_passkeys(&mut self, uuid: &Uuid) -> Result<Vec<Passkey>, Error>;
 
-    /// Insert player permissions.
+    /// Insert player permission.
     async fn insert_permission(
         &mut self,
         uuid: &Uuid,
@@ -43,6 +46,16 @@ pub trait Db {
 
     /// Select player permissions.
     async fn select_permissions(&mut self, cred_id: &Uuid) -> Result<HashSet<Permission>, Error>;
+
+    /// Insert player role.
+    async fn insert_role(
+        &mut self,
+        uuid: &Uuid,
+        role: &Role,
+    ) -> Result<(), Error>;
+
+    /// Select player roles.
+    async fn select_roles(&mut self, cred_id: &Uuid) -> Result<HashSet<Role>, Error>;
 
     /// Insert new target block.
     async fn insert_target(&mut self, block: u32) -> Result<(), Error>;
@@ -73,6 +86,17 @@ pub trait Db {
 
 #[async_trait]
 impl<'c> Db for Transaction<'c, Sqlite> {
+    async fn select_exists_player(&mut self) -> Result<bool, Error> {
+        let exists_query =
+            sqlx::query::<Sqlite>("SELECT EXISTS (SELECT 1 FROM player LIMIT 1)");
+
+        exists_query
+            .fetch_one(&mut **self)
+            .await
+            .map_err(Error::Sqlx)
+            .map(|row| row.get::<bool, usize>(0))
+    }
+
     async fn insert_player(&mut self, name: &String, uuid: &Uuid) -> Result<(), Error> {
         let query = sqlx::query("INSERT INTO player (uuid, name) VALUES (?, ?)")
             .bind(uuid.to_string())
@@ -84,15 +108,27 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .map(|_| ())
     }
 
-    async fn select_player_uuid(&mut self, name: &String) -> Result<Uuid, Error> {
-        let query =
-            sqlx::query::<Sqlite>("SELECT uuid FROM player WHERE name IS ?").bind(name.clone());
-        query
-            .fetch_one(&mut **self)
+    async fn select_player_by_uuid(&mut self, uuid: &Uuid) -> Result<Option<Player>, Error> {
+        let name_query =
+            sqlx::query::<Sqlite>("SELECT name FROM player WHERE uuid IS ?").bind(uuid.to_string());
+
+        let name = name_query
+            .fetch_optional(&mut **self)
             .await
-            .map_err(Error::from)
-            .map(|row| row.get::<String, usize>(0))
-            .and_then(|uuid| Uuid::from_str(uuid.as_str()).map_err(Error::from))
+            .map_err(Error::Sqlx)?
+            .map(|row| row.get::<String, usize>(0));
+
+        if let Some(name) = name {
+            let uuid = uuid.clone();
+            let passkeys = self.select_player_passkeys(&uuid).await?;
+            Ok(Some(Player {
+                uuid,
+                name,
+                passkeys,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     async fn select_player_by_credential(
@@ -127,27 +163,15 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         }
     }
 
-    async fn select_player_by_uuid(&mut self, uuid: &Uuid) -> Result<Option<Player>, Error> {
-        let name_query =
-            sqlx::query::<Sqlite>("SELECT name FROM player WHERE uuid IS ?").bind(uuid.to_string());
-
-        let name = name_query
-            .fetch_optional(&mut **self)
+    async fn select_player_uuid(&mut self, name: &String) -> Result<Uuid, Error> {
+        let query =
+            sqlx::query::<Sqlite>("SELECT uuid FROM player WHERE name IS ?").bind(name.clone());
+        query
+            .fetch_one(&mut **self)
             .await
-            .map_err(Error::Sqlx)?
-            .map(|row| row.get::<String, usize>(0));
-
-        if let Some(name) = name {
-            let uuid = uuid.clone();
-            let passkeys = self.select_player_passkeys(&uuid).await?;
-            Ok(Some(Player {
-                uuid,
-                name,
-                passkeys,
-            }))
-        } else {
-            Ok(None)
-        }
+            .map_err(Error::from)
+            .map(|row| row.get::<String, usize>(0))
+            .and_then(|uuid| Uuid::from_str(uuid.as_str()).map_err(Error::from))
     }
 
     async fn select_player_name(&mut self, uuid: &Uuid) -> Result<String, Error> {
@@ -198,11 +222,9 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         uuid: &Uuid,
         permission: &Permission,
     ) -> Result<(), Error> {
-        let json = serde_json::to_string(permission).map_err(Error::from)?;
-
         let query = sqlx::query::<Sqlite>("INSERT INTO authz (uuid, permission) VALUES (?, ?)")
             .bind(uuid.to_string())
-            .bind(json);
+            .bind(permission.to_string());
 
         query
             .execute(&mut **self)
@@ -220,8 +242,35 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .fetch_all(&mut **self)
             .await
             .map_err(|err| err.into())
-            .map(|pv| pv.into_iter().collect())
-        // serde_json::to_string(keychain).expect("keychain json")
+            .map(|perms| perms.into_iter().collect())
+    }
+
+    async fn insert_role(
+        &mut self,
+        uuid: &Uuid,
+        role: &Role,
+    ) -> Result<(), Error> {
+        let query = sqlx::query::<Sqlite>("INSERT INTO player_role (uuid, role) VALUES (?, ?)")
+            .bind(uuid.to_string())
+            .bind(role.to_string());
+
+        query
+            .execute(&mut **self)
+            .await
+            .map_err(Error::from)
+            .map(|_| ())
+    }
+
+    async fn select_roles(&mut self, uuid: &Uuid) -> Result<HashSet<Role>, Error> {
+        let query =
+            sqlx::query_as::<Sqlite, Role>("SELECT role FROM player_role WHERE uuid IS ?")
+                .bind(uuid.to_string());
+
+        query
+            .fetch_all(&mut **self)
+            .await
+            .map_err(|err| err.into())
+            .map(|roles| roles.into_iter().collect())
     }
 
     async fn insert_target(&mut self, block: u32) -> Result<(), Error> {
@@ -347,13 +396,20 @@ impl FromRow<'_, SqliteRow> for GuessRow {
 impl FromRow<'_, SqliteRow> for Permission {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
         let permission_string = row.get::<&str, usize>(0);
-        match permission_string {
-            "AssignAdmin" => Ok(Permission::AssignAdmin),
-            "ChangeTargetBlock" => Ok(Permission::ChangeTargetBlock),
-            invalid => Err(sqlx::Error::Decode(Box::<super::error::Error>::new(
-                super::error::Error::InvalidPermission(invalid.to_string()),
-            ))),
-        }
+        Permission::from_str(permission_string)
+            .map_err(|_| sqlx::Error::Decode(Box::<super::error::Error>::new(
+                super::error::Error::InvalidPermission(permission_string.to_string()),
+            )))
+    }
+}
+
+impl FromRow<'_, SqliteRow> for Role {
+    fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
+        let role_string = row.get::<&str, usize>(0);
+        Role::from_str(role_string)
+            .map_err(|_| sqlx::Error::Decode(Box::<super::error::Error>::new(
+                super::error::Error::InvalidRole(role_string.to_string()),
+            )))
     }
 }
 

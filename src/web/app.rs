@@ -85,7 +85,6 @@ impl App {
 
         let app = Router::new()
             .merge(restricted::router())
-            .route_layer(permission_required!(Backend, Permission::ChangeTargetBlock))
             .merge(protected::router())
             .route_layer(login_required!(Backend, login_url = "/login"))
             .merge(auth::router())

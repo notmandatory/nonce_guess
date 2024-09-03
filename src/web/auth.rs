@@ -11,7 +11,7 @@ use axum::{
 use axum_login::axum::async_trait;
 use axum_login::{AuthUser, AuthnBackend, AuthzBackend, UserId};
 use maud::Markup;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::{Pool, Sqlite, SqlitePool};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -204,6 +204,8 @@ pub async fn finish_register(
                 .await
                 .map_err(|_| Error::Unknown)?;
 
+            let is_first_player = !tx.select_exists_player().await?;
+
             //TODO: This is where we would store the credential in a db, or persist them in some other way.
             // users_guard
             //     .keys
@@ -219,6 +221,11 @@ pub async fn finish_register(
                     debug!("{:?}", e);
                     Error::Unknown
                 })?;
+
+            if is_first_player {
+                tx.insert_role(&user_unique_id, &Role::Adm).await?;
+            }
+
             tx.commit().await.map_err(|e| {
                 debug!("{:?}", e);
                 Error::Unknown
@@ -480,7 +487,7 @@ impl Backend {
         // Now, with the builder you can define other options.
         // Set a "nice" relying party name. Has no security properties and
         // may be changed in the future.
-        let builder = builder.rp_name("Axum Webauthn-rs");
+        let builder = builder.rp_name("Nonce Guess");
 
         // Consume the builder and create our webauthn instance.
         let webauthn = Arc::new(builder.build().expect("Invalid configuration"));
@@ -594,12 +601,32 @@ impl AuthnBackend for Backend {
 }
 
 // Permissions that can be granted to a player.
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumString)]
 pub(crate) enum Permission {
-    /// Assign a player to the admin group.
-    AssignAdmin,
+    /// Assign a player to the admin role.
+    AssignAdm,
+    /// Assign a player to the moderator role.
+    AssignMod,
     /// Change the target block height.
     ChangeTargetBlock,
+}
+
+// Roles (with permissions) that can be granted to a player.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, strum_macros::Display, strum_macros::EnumString)]
+pub(crate) enum Role {
+    /// Administrator.
+    Adm,
+    /// Moderator.
+    Mod,
+}
+
+impl Role {
+    fn permissions(&self) -> Vec<Permission> {
+        match &self {
+            Role::Adm => vec!(Permission::AssignAdm, Permission::AssignMod, Permission::ChangeTargetBlock),
+            Role::Mod => vec!(Permission::ChangeTargetBlock),
+        }
+    }
 }
 
 #[async_trait]
@@ -624,12 +651,6 @@ impl AuthzBackend for Backend {
         &self,
         user: &Self::User,
     ) -> Result<HashSet<Self::Permission>, Self::Error> {
-        // TODO replace with logic to assign first admin
-        // if user.name == "admin" {
-        //     return Ok([Permission::AssignAdmin, Permission::ChangeTargetBlock].into());
-        // }
-        // // TODO replace with db query to lookup user group permissions
-        // Ok(HashSet::new())
         let mut tx = self
             .pool
             .begin()
@@ -637,7 +658,10 @@ impl AuthzBackend for Backend {
             .map_err(db::Error::Sqlx)
             .map_err(Error::Db)?;
 
-        tx.select_permissions(&user.uuid).await.map_err(Error::from)
+        let roles = tx.select_roles(&user.uuid).await.map_err(Error::from)?;
+        let permissions = roles.into_iter()
+            .flat_map(|r| r.permissions()).collect();
+        Ok(permissions)
     }
 }
 
