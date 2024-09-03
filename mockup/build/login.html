@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+    <head>
+        <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <link href="css/style.css" rel="stylesheet" />
+        <link
+            rel="apple-touch-icon"
+            sizes="180x180"
+            href="img/apple-touch-icon.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="32x32"
+            href="img/favicon-32x32.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="16x16"
+            href="img/favicon-16x16.png"
+        />
+        <link rel="manifest" href="site.webmanifest" />
+        <title>Login</title>
+    </head>
+    <body
+        class="min-h-screen bg-slate-50 dark:bg-black dark:text-white"
+        hx-boost="true"
+    >
+        <main class="max-w-4xl mx-auto">
+            <section
+                id="hero"
+                class="flex flex-col-reverse justify-center sm:flex-row p-6 items-center gap-8 mb-12 scroll-mt-20"
+            >
+                <article class="sm:w-1/2">
+                    <h2
+                        class="max-w-md text-4xl font-bold text-center sm:text-left text-slate-900 dark:text-white"
+                    >
+                        Guess the
+                        <span class="text-indigo-700 dark:text-indigo-300"
+                            >Block Nonce</span
+                        >
+                        Win a Prize!
+                    </h2>
+                </article>
+                <img
+                    class="h-20 w-auto"
+                    src="img/apple-touch-icon.png"
+                    alt="Rocket Dab"
+                />
+            </section>
+            <section
+                id="login_form"
+                class="flex flex-col justify-center p-6 items-center gap-4 scroll-mt-20"
+            >
+                <form class="group" novalidate>
+                    <label
+                        class="text-left text-xl font-bold text-slate-900 dark:text-white"
+                        for="username"
+                    >
+                        Name
+                    </label>
+                    <input
+                        class="block mt-2 w-60 rounded-md py-1.5 dark:bg-gray-900 dark:text-white text-gray-900 shadow-sm ring-inset ring-gray-300 dark:ring-black placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 peer invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+                        id="username"
+                        name="username"
+                        type="text"
+                        autocomplete="username webauthn"
+                        required=""
+                        placeholder=" "
+                        pattern="[0-9a-zA-Z_]{3,20}"
+                    />
+                    <div
+                        class="hidden w-60 py-1.5 leading-6 gap-6 text-red-600 font-semibold peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
+                    >
+                        <p id="error_message">
+                            Must be 3-20 characters and only include A-Z, 0-9,
+                            and underscore.
+                        </p>
+                    </div>
+                    <div class="mt-6 flex items-center justify-center gap-x-6">
+                        <button
+                            class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 group-invalid:pointer-events-none group-invalid:opacity-30"
+                            type="submit"
+                            onclick="login()"
+                        >
+                            Sign in
+                        </button>
+                        <button
+                            class="flex justify-center rounded-md bg-indigo-300 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 dark:hover:bg-indigo-200 shadow-sm hover:bg-indigo-200 focus-visible:outline dark:bg-indigo-300 focus-visible:outline-2 focus-visible:outline-offset-2 group-invalid:pointer-events-none group-invalid:opacity-30"
+                            type="submit"
+                            onclick="register()"
+                        >
+                            Register
+                        </button>
+                    </div>
+                    <div
+                        class="py-1.5 leading-6 gap-6 text-green-600 font-semibold"
+                    >
+                        <p id="flash_message"></p>
+                    </div>
+                    <input type="hidden" name="next" value="/" />
+                </form>
+                <p class="mt-5 text-center text-sm text-gray-500">
+                    No account? register with your
+                    <a
+                        class="font-semibold leading-6 text-indigo-600 hover:text-indigo-500"
+                        href="https://fidoalliance.org/passkeys/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        >Passkey
+                    </a>
+                    enabled browser.
+                </p>
+            </section>
+        </main>
+    </body>
+</html>

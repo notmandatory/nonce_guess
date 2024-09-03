@@ -29,6 +29,8 @@ sqlx = { version = "0.7.2", features = [
     "migrate",
     "time",
 ] }
+strum = "0.26"
+strum_macros = "0.26"
 thiserror = "1"
 time = "0.3.36"
 tokio = { version = "1.21", features = ["full"] }

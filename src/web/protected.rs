@@ -20,7 +20,6 @@ mod get {
     use axum::response::IntoResponse;
     use axum_login::AuthzBackend;
     use sqlx::sqlite::SqlitePool;
-    use tracing::debug;
 
     pub async fn home(
         auth_session: AuthSession,
