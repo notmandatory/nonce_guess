@@ -1,5 +1,0 @@
-build:
-    tailwindcss -i src/input.css -o build/css/style.css
-
-watch:
-    tailwindcss -i src/input.css -o build/css/style.css --watch

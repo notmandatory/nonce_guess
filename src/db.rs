@@ -48,11 +48,7 @@ pub trait Db {
     async fn select_permissions(&mut self, cred_id: &Uuid) -> Result<HashSet<Permission>, Error>;
 
     /// Insert player role.
-    async fn insert_role(
-        &mut self,
-        uuid: &Uuid,
-        role: &Role,
-    ) -> Result<(), Error>;
+    async fn insert_role(&mut self, uuid: &Uuid, role: &Role) -> Result<(), Error>;
 
     /// Select player roles.
     async fn select_roles(&mut self, cred_id: &Uuid) -> Result<HashSet<Role>, Error>;
@@ -87,8 +83,7 @@ pub trait Db {
 #[async_trait]
 impl<'c> Db for Transaction<'c, Sqlite> {
     async fn select_exists_player(&mut self) -> Result<bool, Error> {
-        let exists_query =
-            sqlx::query::<Sqlite>("SELECT EXISTS (SELECT 1 FROM player LIMIT 1)");
+        let exists_query = sqlx::query::<Sqlite>("SELECT EXISTS (SELECT 1 FROM player LIMIT 1)");
 
         exists_query
             .fetch_one(&mut **self)
@@ -245,11 +240,7 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .map(|perms| perms.into_iter().collect())
     }
 
-    async fn insert_role(
-        &mut self,
-        uuid: &Uuid,
-        role: &Role,
-    ) -> Result<(), Error> {
+    async fn insert_role(&mut self, uuid: &Uuid, role: &Role) -> Result<(), Error> {
         let query = sqlx::query::<Sqlite>("INSERT INTO player_role (uuid, role) VALUES (?, ?)")
             .bind(uuid.to_string())
             .bind(role.to_string());
@@ -262,9 +253,8 @@ impl<'c> Db for Transaction<'c, Sqlite> {
     }
 
     async fn select_roles(&mut self, uuid: &Uuid) -> Result<HashSet<Role>, Error> {
-        let query =
-            sqlx::query_as::<Sqlite, Role>("SELECT role FROM player_role WHERE uuid IS ?")
-                .bind(uuid.to_string());
+        let query = sqlx::query_as::<Sqlite, Role>("SELECT role FROM player_role WHERE uuid IS ?")
+            .bind(uuid.to_string());
 
         query
             .fetch_all(&mut **self)
@@ -396,20 +386,22 @@ impl FromRow<'_, SqliteRow> for GuessRow {
 impl FromRow<'_, SqliteRow> for Permission {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
         let permission_string = row.get::<&str, usize>(0);
-        Permission::from_str(permission_string)
-            .map_err(|_| sqlx::Error::Decode(Box::<super::error::Error>::new(
+        Permission::from_str(permission_string).map_err(|_| {
+            sqlx::Error::Decode(Box::<super::error::Error>::new(
                 super::error::Error::InvalidPermission(permission_string.to_string()),
-            )))
+            ))
+        })
     }
 }
 
 impl FromRow<'_, SqliteRow> for Role {
     fn from_row(row: &SqliteRow) -> Result<Self, sqlx::Error> {
         let role_string = row.get::<&str, usize>(0);
-        Role::from_str(role_string)
-            .map_err(|_| sqlx::Error::Decode(Box::<super::error::Error>::new(
+        Role::from_str(role_string).map_err(|_| {
+            sqlx::Error::Decode(Box::<super::error::Error>::new(
                 super::error::Error::InvalidRole(role_string.to_string()),
-            )))
+            ))
+        })
     }
 }
 

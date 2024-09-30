@@ -8,6 +8,7 @@ pub(crate) fn base(title: String, head: Option<Markup>, content: Markup) -> Mark
     html! {
       (DOCTYPE)
       head {
+        meta http-equiv="content-type" content="text/html; charset=UTF-8";
         meta charset="UTF-8";
         meta name="viewport" content="width=device-width, initial-scale=1.0";
         // TODO meta http-equiv="Content-Security-Policy" content="default-src 'self';
@@ -42,8 +43,9 @@ pub(crate) fn base(title: String, head: Option<Markup>, content: Markup) -> Mark
             (head)
         }
       }
-      body hx-boost="true" {
-          div #content { (content) }
+      body ."min-h-screen"."bg-slate-50"."dark:bg-black"."dark:text-white"
+          hx-boost="true" {
+          main #"content"."max-w-4xl"."mx-auto" { (content) }
       }
     }
 }

@@ -15,7 +15,7 @@ Build and Run:
 
 1. Start the server, it will also serve the latest web client
    ```shell
-   RUST_LOG=debug cargo -- cargo run
+   RUST_LOG=debug cargo run
 
 By default, the data is stored in SQLite memory database. For authentication the URL must use `localhost` and not `127.0.0.1`, e.g. `http://localhost:3000`.
 
