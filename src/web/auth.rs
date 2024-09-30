@@ -623,8 +623,12 @@ pub(crate) enum Role {
 impl Role {
     fn permissions(&self) -> Vec<Permission> {
         match &self {
-            Role::Adm => vec!(Permission::AssignAdm, Permission::AssignMod, Permission::ChangeTargetBlock),
-            Role::Mod => vec!(Permission::ChangeTargetBlock),
+            Role::Adm => vec![
+                Permission::AssignAdm,
+                Permission::AssignMod,
+                Permission::ChangeTargetBlock,
+            ],
+            Role::Mod => vec![Permission::ChangeTargetBlock],
         }
     }
 }
@@ -659,8 +663,7 @@ impl AuthzBackend for Backend {
             .map_err(Error::Db)?;
 
         let roles = tx.select_roles(&user.uuid).await.map_err(Error::from)?;
-        let permissions = roles.into_iter()
-            .flat_map(|r| r.permissions()).collect();
+        let permissions = roles.into_iter().flat_map(|r| r.permissions()).collect();
         Ok(permissions)
     }
 }

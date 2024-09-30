@@ -1,0 +1,17 @@
+{
+  "name": "nonce_guess",
+  "version": "1.0.0",
+  "description": "",
+  "main": "tailwind.config.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/notmandatory/nonce_guess.git"
+  },
+  "private": true,
+  "dependencies": {
+    "@tailwindcss/forms": "^0.5.9"
+  }
+}
