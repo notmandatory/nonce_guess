@@ -1,5 +1,10 @@
 # Nonce Guess
 
+### Setup
+
+1. Install system packages: gcc, libssl-dev, pkg-config
+2. cargo install trunk
+
 ### Local Testing
 
 1. Start the wasm web client builder in watch mode
