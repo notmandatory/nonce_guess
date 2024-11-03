@@ -87,7 +87,6 @@ mod get {
 mod post {
     use super::*;
     use crate::error::Error;
-    use crate::model::Target;
     use crate::web::auth::AuthSession;
     use crate::web::auth::{self, Permission};
     use crate::{db::Db, web::template};

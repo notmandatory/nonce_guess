@@ -10,6 +10,41 @@ pub fn home_page(
     guesses: Vec<Guess>,
 ) -> Markup {
     let content = html! {
+     (hero_div())
+     @if change_target {
+         (change_target_div())
+     }
+     @if let Some(target) = target {
+         (target_div(target))
+     }
+     @if my_guess.is_none() && !change_target  {
+         (add_guess_div())
+     }
+     (guesses_div(guesses))
+     (logout_div())
+    };
+    base("Nonce Guess".to_string(), None, content)
+}
+
+pub fn logout_div() -> Markup {
+    html! {
+        div ."sm:mx-auto"."sm:w-full"."py-6"."divide-y"."md:max-w-4xl" {
+            div "mt-8"."gap-6" {
+                button
+                type="submit"
+                hx-get="/logout"
+                hx-push-url="/"
+                    ."rounded-md"."bg-indigo-600"."px-2.5"."py-1.5"."text-base"."font-semibold"."text-white"."shadow-sm"."hover:bg-indigo-500"."focus-visible:outline"."focus-visible:outline-2"."focus-visible:outline-offset-2"."focus-visible:outline-indigo-600"
+                {
+                "Logout"
+                }
+            }
+        }
+    }
+}
+
+pub fn hero_div() -> Markup {
+    html! {
         div .flex."min-h-full"."flex-col"."justify-center"."px-6"."py-12"."lg:px-8" {
             div ."sm:mx-auto"."sm:w-full"."py-6"."md:max-w-4xl" {
                 div ."py-6" {
@@ -20,37 +55,8 @@ pub fn home_page(
                     }
                 }
             }
-
-
-            @if change_target {
-                (change_target_div())
-            }
-
-            @if let Some(target) = target {
-                (target_div(target))
-            }
-
-            @if my_guess.is_none() && !change_target  {
-                (add_guess_div())
-            }
-
-            (guesses_div(guesses))
-
-            div ."sm:mx-auto"."sm:w-full"."py-6"."divide-y"."md:max-w-4xl" {
-                div "mt-8"."gap-6" {
-                    button
-                    type="submit"
-                    hx-get="/logout"
-                    hx-push-url="/"
-                        ."rounded-md"."bg-indigo-600"."px-2.5"."py-1.5"."text-base"."font-semibold"."text-white"."shadow-sm"."hover:bg-indigo-500"."focus-visible:outline"."focus-visible:outline-2"."focus-visible:outline-offset-2"."focus-visible:outline-indigo-600"
-                    {
-                    "Logout"
-                    }
-                }
-            }
         }
-    };
-    base("Nonce Guess".to_string(), None, content)
+    }
 }
 
 fn guesses_div(guesses: Vec<Guess>) -> Markup {
@@ -130,7 +136,7 @@ fn add_guess_div() -> Markup {
                                 div ."mt-2"."max-xl"."text-base"."text-gray-500" {
                                     p { "Enter your nonce guess below. Your guess must be 8 hexadecimal characters which
                                         are a-f, A-F and 0-9.
-                                        For example: "ab03f23e", "f2345c9d", etc. Every nonce in hex has a corresponding
+                                        For example: `ab03f23e`, `f2345c9d`, etc. Every nonce in hex has a corresponding
                                         decimal representation, the guess that is closest numerically to the actual block nonce
                                         is the winner." }
                                 }
@@ -153,10 +159,11 @@ fn add_guess_div() -> Markup {
                                         }
                                     }
                                     div ."py-1.5" {
-                                        button type="button"
-                                                hx-post="/"
-                                                hx-target="body"
-                                                hx-target-5xx="#error_message"
+                                        button type="submit"
+                                            hx-post="/"
+                                            hx-target="body"
+                                            hx-target-5xx="#error_message"
+                                            hx-trigger="click, keyup[key=Enter]"
                                                 ."inline-flex"."py-1.5"."items-center"."rounded-md"."bg-indigo-600"."px-3"."py-2"."text-base"."font-semibold"."text-white"."shadow-sm"."hover:bg-indigo-500"."focus-visible:outline"."focus-visible:outline-2"."focus-visible:outline-offset-2"."focus-visible:outline-indigo-500"."group-invalid:pointer-events-none"."group-invalid:opacity-30"{
                                             "Add Guess"
                                         }
@@ -196,10 +203,11 @@ fn change_target_div() -> Markup {
                                         }
                                     }
                                     div ."py-1.5" {
-                                        button type="button"
-                                                hx-post="/target"
-                                                hx-target="body"
-                                                hx-target-5xx="#error_message"
+                                        button type="submit"
+                                            hx-post="/target"
+                                            hx-target="body"
+                                            hx-target-5xx="#error_message"
+                                            hx-trigger="click, keyup[key=Enter]"
                                                 ."inline-flex"."py-1.5"."items-center"."rounded-md"."bg-indigo-600"."px-3"."py-2"."text-base"."font-semibold"."text-white"."shadow-sm"."hover:bg-indigo-500"."focus-visible:outline"."focus-visible:outline-2"."focus-visible:outline-offset-2"."focus-visible:outline-indigo-500"."group-invalid:pointer-events-none"."group-invalid:opacity-30"{
                                             "Set Block"
                                         }

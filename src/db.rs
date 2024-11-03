@@ -274,7 +274,7 @@ impl<'c> Db for Transaction<'c, Sqlite> {
 
     async fn select_current_target(&mut self) -> Result<Target, Error> {
         let query = sqlx::query_as::<Sqlite, TargetRow>(
-            "SELECT * FROM target WHERE block IS (SELECT MAX(block) FROM target) AND nonce IS NULL",
+            "SELECT * FROM target WHERE block IS (SELECT MAX(block) FROM target)",// AND nonce IS NULL",
         );
         query
             .fetch_one(&mut **self)

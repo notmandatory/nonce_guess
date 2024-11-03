@@ -1,4 +1,4 @@
-use axum::{http::StatusCode, response::IntoResponse, routing::post, Router};
+use axum::{routing::post, Router};
 use axum_login::permission_required;
 use sqlx::SqlitePool;
 
@@ -49,7 +49,7 @@ mod post {
 
                 let uuid = player.uuid;
                 let mut tx = pool.begin().await.expect("tx");
-                let player_name = tx.select_player_name(&uuid).await.ok();
+                let _player_name = tx.select_player_name(&uuid).await.ok();
                 //let current_target = tx.select_current_target().await.ok();
                 //let current_block = current_target.as_ref().map(|t| t.block);
 
