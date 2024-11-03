@@ -1,8 +1,8 @@
 use crate::db::Db;
 use crate::error::Error;
 use crate::model::Block;
-use crate::web::auth::Backend;
 use crate::web::auth;
+use crate::web::auth::Backend;
 use axum::Router;
 use axum_embed::ServeEmbed;
 use axum_login::{
@@ -100,7 +100,7 @@ impl App {
             .with_state(self.pool)
             .nest_service("/assets", serve_assets);
 
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:8081").await.unwrap();
 
         // Ensure we use a shutdown signal to abort the tasks.
         axum::serve(listener, app.into_make_service())
@@ -160,7 +160,10 @@ async fn update_target_nonce(pool: SqlitePool) -> Result<(), Error> {
     let current_target = tx.select_current_target().await?;
     tx.commit().await.map_err(crate::db::Error::Sqlx)?;
     if current_target.nonce.is_none() {
-        let client = reqwest::Client::new();
+        let client = reqwest::Client::builder()
+            .use_native_tls()
+            .danger_accept_invalid_certs(true)
+            .build()?;
         let block_height_response = client
             .get(format!(
                 "https://mempool.space/api/block-height/{}",

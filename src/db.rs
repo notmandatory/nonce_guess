@@ -6,7 +6,7 @@ use sqlx::{FromRow, Row, Sqlite, Transaction};
 use std::collections::HashSet;
 use std::str::FromStr;
 use uuid::Uuid;
-use webauthn_rs::prelude::{CredentialID, Passkey};
+use webauthn_rs::prelude::Passkey;
 
 #[async_trait]
 pub trait Db {
@@ -19,11 +19,11 @@ pub trait Db {
     /// Select player by UUID.
     async fn select_player_by_uuid(&mut self, uuid: &Uuid) -> Result<Option<Player>, Error>;
 
-    /// Select player by credential id.
-    async fn select_player_by_credential(
-        &mut self,
-        cred_id: &CredentialID,
-    ) -> Result<Option<Player>, Error>;
+    // /// Select player by credential id.
+    // async fn select_player_by_credential(
+    //     &mut self,
+    //     cred_id: &CredentialID,
+    // ) -> Result<Option<Player>, Error>;
 
     /// Select player UUID.
     async fn select_player_uuid(&mut self, name: &String) -> Result<Uuid, Error>;
@@ -37,12 +37,12 @@ pub trait Db {
     /// Select player passkeys.
     async fn select_player_passkeys(&mut self, uuid: &Uuid) -> Result<Vec<Passkey>, Error>;
 
-    /// Insert player permission.
-    async fn insert_permission(
-        &mut self,
-        uuid: &Uuid,
-        permissions: &Permission,
-    ) -> Result<(), Error>;
+    // /// Insert player permission.
+    // async fn insert_permission(
+    //     &mut self,
+    //     uuid: &Uuid,
+    //     permissions: &Permission,
+    // ) -> Result<(), Error>;
 
     /// Select player permissions.
     async fn select_permissions(&mut self, cred_id: &Uuid) -> Result<HashSet<Permission>, Error>;
@@ -126,37 +126,37 @@ impl<'c> Db for Transaction<'c, Sqlite> {
         }
     }
 
-    async fn select_player_by_credential(
-        &mut self,
-        cred_id: &CredentialID,
-    ) -> Result<Option<Player>, Error> {
-        let name_uuid_query = sqlx::query::<Sqlite>("SELECT player.name, player.uuid FROM player JOIN authn ON player.uuid = authn.uuid WHERE authn.cred_id IS ?")
-                .bind(cred_id.as_slice());
+    // async fn select_player_by_credential(
+    //     &mut self,
+    //     cred_id: &CredentialID,
+    // ) -> Result<Option<Player>, Error> {
+    //     let name_uuid_query = sqlx::query::<Sqlite>("SELECT player.name, player.uuid FROM player JOIN authn ON player.uuid = authn.uuid WHERE authn.cred_id IS ?")
+    //             .bind(cred_id.as_slice());
 
-        let name_uuid = name_uuid_query
-            .fetch_optional(&mut **self)
-            .await
-            .map_err(Error::from)
-            .map(|opt_row| {
-                opt_row.map(|row| {
-                    let name = row.get::<String, usize>(0);
-                    let uuid = row.get::<String, usize>(1);
-                    (name, uuid)
-                })
-            })?;
+    //     let name_uuid = name_uuid_query
+    //         .fetch_optional(&mut **self)
+    //         .await
+    //         .map_err(Error::from)
+    //         .map(|opt_row| {
+    //             opt_row.map(|row| {
+    //                 let name = row.get::<String, usize>(0);
+    //                 let uuid = row.get::<String, usize>(1);
+    //                 (name, uuid)
+    //             })
+    //         })?;
 
-        if let Some((name, uuid)) = name_uuid {
-            let uuid = Uuid::from_str(uuid.as_str()).map_err(Error::from)?;
-            let passkeys = self.select_player_passkeys(&uuid).await?;
-            Ok(Some(Player {
-                uuid,
-                name,
-                passkeys,
-            }))
-        } else {
-            Ok(None)
-        }
-    }
+    //     if let Some((name, uuid)) = name_uuid {
+    //         let uuid = Uuid::from_str(uuid.as_str()).map_err(Error::from)?;
+    //         let passkeys = self.select_player_passkeys(&uuid).await?;
+    //         Ok(Some(Player {
+    //             uuid,
+    //             name,
+    //             passkeys,
+    //         }))
+    //     } else {
+    //         Ok(None)
+    //     }
+    // }
 
     async fn select_player_uuid(&mut self, name: &String) -> Result<Uuid, Error> {
         let query =
@@ -212,21 +212,21 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             })
     }
 
-    async fn insert_permission(
-        &mut self,
-        uuid: &Uuid,
-        permission: &Permission,
-    ) -> Result<(), Error> {
-        let query = sqlx::query::<Sqlite>("INSERT INTO authz (uuid, permission) VALUES (?, ?)")
-            .bind(uuid.to_string())
-            .bind(permission.to_string());
+    // async fn insert_permission(
+    //     &mut self,
+    //     uuid: &Uuid,
+    //     permission: &Permission,
+    // ) -> Result<(), Error> {
+    //     let query = sqlx::query::<Sqlite>("INSERT INTO authz (uuid, permission) VALUES (?, ?)")
+    //         .bind(uuid.to_string())
+    //         .bind(permission.to_string());
 
-        query
-            .execute(&mut **self)
-            .await
-            .map_err(Error::from)
-            .map(|_| ())
-    }
+    //     query
+    //         .execute(&mut **self)
+    //         .await
+    //         .map_err(Error::from)
+    //         .map(|_| ())
+    // }
 
     async fn select_permissions(&mut self, uuid: &Uuid) -> Result<HashSet<Permission>, Error> {
         let query =
@@ -274,7 +274,7 @@ impl<'c> Db for Transaction<'c, Sqlite> {
 
     async fn select_current_target(&mut self) -> Result<Target, Error> {
         let query = sqlx::query_as::<Sqlite, TargetRow>(
-            "SELECT * FROM target WHERE block IS (SELECT MAX(block) FROM target)",// AND nonce IS NULL",
+            "SELECT * FROM target WHERE block IS (SELECT MAX(block) FROM target)", // AND nonce IS NULL",
         );
         query
             .fetch_one(&mut **self)

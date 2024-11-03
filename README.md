@@ -36,4 +36,4 @@ In test or release mode the web client can be found at: http://localhost:3000/
 2. `docker run -d --rm -it -p 8081:8081 -v nonce_vol:/data --name nonce_guess_app nonce_guess`
 3. Visit http://localhost:8081/ in a browser
 
-Note: above steps also work with `podman` instead of `docker`.
+Note: on linux above steps also work with `podman` instead of `docker`.

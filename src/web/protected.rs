@@ -12,8 +12,6 @@ pub fn router() -> Router<SqlitePool> {
 mod get {
     use super::*;
     use crate::db::Db;
-    use crate::error::Error;
-    use crate::model::Block;
     use crate::web::auth::{AuthSession, Permission};
     use crate::web::template::home::home_page;
     use axum::extract::State;
@@ -53,35 +51,35 @@ mod get {
         }
     }
 
-    async fn get_target_nonce(State(pool): State<SqlitePool>) -> Result<String, Error> {
-        //let nonce = u32::from_str(nonce.as_str())?;
-        let client = reqwest::Client::new();
-        let mut tx = pool.begin().await.map_err(crate::db::Error::Sqlx)?;
-        let current_target = tx.select_current_target().await?;
-        let block_height_response = client
-            .get(format!(
-                "https://mempool.space/api/block-height/{}",
-                current_target.block
-            ))
-            .send()
-            .await?;
-        if block_height_response.status().is_success() {
-            let block_hash = block_height_response.text().await?;
-            let block_response = client
-                .get(format!("https://mempool.space/api/block/{}", block_hash))
-                .send()
-                .await?;
-            if block_response.status().is_success() {
-                let block: Block = block_response.json().await?;
-                let nonce = block.nonce;
-                tx.set_current_nonce(nonce).await?;
-                tx.set_guesses_block(block.height).await?;
-                tx.commit().await.map_err(crate::db::Error::Sqlx)?;
-                return Ok(nonce.to_string());
-            }
-        }
-        Ok(String::default())
-    }
+    // async fn get_target_nonce(State(pool): State<SqlitePool>) -> Result<String, Error> {
+    //     //let nonce = u32::from_str(nonce.as_str())?;
+    //     let client = reqwest::Client::new();
+    //     let mut tx = pool.begin().await.map_err(crate::db::Error::Sqlx)?;
+    //     let current_target = tx.select_current_target().await?;
+    //     let block_height_response = client
+    //         .get(format!(
+    //             "https://mempool.space/api/block-height/{}",
+    //             current_target.block
+    //         ))
+    //         .send()
+    //         .await?;
+    //     if block_height_response.status().is_success() {
+    //         let block_hash = block_height_response.text().await?;
+    //         let block_response = client
+    //             .get(format!("https://mempool.space/api/block/{}", block_hash))
+    //             .send()
+    //             .await?;
+    //         if block_response.status().is_success() {
+    //             let block: Block = block_response.json().await?;
+    //             let nonce = block.nonce;
+    //             tx.set_current_nonce(nonce).await?;
+    //             tx.set_guesses_block(block.height).await?;
+    //             tx.commit().await.map_err(crate::db::Error::Sqlx)?;
+    //             return Ok(nonce.to_string());
+    //         }
+    //     }
+    //     Ok(String::default())
+    // }
 }
 
 mod post {
