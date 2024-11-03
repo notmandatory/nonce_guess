@@ -3,7 +3,7 @@ use maud::{html, Markup};
 use super::base;
 
 // login page template
-pub fn login_page(next: Option<String>) -> Markup {
+pub fn login_page(_next: Option<String>) -> Markup {
     let head = html! {
         script src="assets/auth.js" async="true" {}
     };
@@ -87,6 +87,7 @@ pub fn login_page(next: Option<String>) -> Markup {
                         button
                             ."flex"."justify-center"."rounded-md"."bg-indigo-600"."px-3"."py-1.5"."text-sm"."font-semibold"."leading-6"."text-gray-100"."shadow-sm"."hover:bg-indigo-500"."focus-visible:outline"."focus-visible:outline-2"."focus-visible:outline-offset-2"."focus-visible:outline-indigo-600"."group-invalid:pointer-events-none"."group-invalid:opacity-30"
                             type="submit"
+                            hx-trigger="click[enterKey]"
                             onclick="login()"
                         { "Sign in" }
                         button
