@@ -476,12 +476,12 @@ pub(crate) struct Backend {
 }
 
 impl Backend {
-    pub(crate) fn new(pool: Pool<Sqlite>) -> Self {
+    pub(crate) fn new(pool: Pool<Sqlite>, domain_name: String, web_url: String) -> Self {
         // Effective domain name.
-        let rp_id = "localhost";
+        let rp_id = domain_name.as_str();
         // Url containing the effective domain name
         // MUST include the port number!
-        let rp_origin = Url::parse("http://localhost:8081").expect("Invalid URL");
+        let rp_origin = Url::parse(web_url.as_str()).expect("Invalid URL");
         let builder = WebauthnBuilder::new(rp_id, &rp_origin).expect("Invalid configuration");
 
         // Now, with the builder you can define other options.
