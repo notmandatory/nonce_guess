@@ -23,4 +23,6 @@ VOLUME /data
 
 ENV RUST_LOG=debug
 ENV NONCE_GUESS_DB_URL=sqlite:///data/nonce_guess.sqlite?mode=rwc
+ENV NONCE_GUESS_DOMAIN_NAME=localhost
+ENV NONCE_GUESS_WEB_URL=http://localhost:8081
 CMD ["./ng_server"]

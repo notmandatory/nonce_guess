@@ -52,7 +52,11 @@ impl App {
         Ok(Self { pool })
     }
 
-    pub async fn serve(self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn serve(
+        self,
+        domain_name: String,
+        web_url: String,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // static assets
         let serve_assets = ServeEmbed::<Assets>::new();
 
@@ -88,7 +92,7 @@ impl App {
         //
         // This combines the session layer with our backend to establish the auth
         // service which will provide the auth session as a request extension.
-        let backend = Backend::new(self.pool.clone());
+        let backend = Backend::new(self.pool.clone(), domain_name, web_url);
         let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
 
         let app = Router::new()
