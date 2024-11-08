@@ -49,12 +49,12 @@ mod post {
 
                 let uuid = player.uuid;
                 let mut tx = pool.begin().await.expect("tx");
-                let _player_name = tx.select_player_name(&uuid).await.ok();
+                //let _player_name = tx.select_player_name(&uuid).await.ok();
                 //let current_target = tx.select_current_target().await.ok();
                 //let current_block = current_target.as_ref().map(|t| t.block);
 
                 // update target block
-                tx.insert_target(new_block)
+                tx.update_target(new_block)
                     .await
                     .map_err(|e| Error::Db(e))?;
                 tx.set_guesses_block(new_block)

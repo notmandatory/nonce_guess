@@ -12,6 +12,7 @@ pub fn router() -> Router<SqlitePool> {
 mod get {
     use super::*;
     use crate::db::Db;
+    use crate::model::{sort_guesses_by_target_diff, Target};
     use crate::web::auth::{AuthSession, Permission};
     use crate::web::template::home::home_page;
     use axum::extract::State;
@@ -34,12 +35,27 @@ mod get {
                 let uuid = player.uuid;
                 let mut tx = pool.begin().await.expect("tx");
                 let target = tx.select_current_target().await.ok();
-                let guesses = if let Some(some_target) = &target {
-                    tx.select_block_guesses(some_target.block).await.ok()
-                } else {
-                    tx.select_guesses().await.ok()
-                }
-                .unwrap_or_default();
+
+                let guesses = match &target {
+                    Some(Target { block:_, nonce: None }) => tx
+                        .select_guesses()
+                        .await
+                        .ok()
+                        .unwrap_or_default(),
+                    Some(Target {
+                        block,
+                        nonce: Some(nonce),
+                    }) => {
+                        let mut guesses = tx
+                            .select_block_guesses(*block)
+                            .await
+                            .ok()
+                            .unwrap_or_default();
+                        sort_guesses_by_target_diff(&mut guesses, *nonce);
+                        guesses
+                    }
+                    None => tx.select_guesses().await.ok().unwrap_or_default(),
+                };
                 let my_guess: Option<u32> = guesses
                     .iter()
                     .find(|g| g.uuid == uuid)
@@ -50,41 +66,11 @@ mod get {
             None => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
         }
     }
-
-    // async fn get_target_nonce(State(pool): State<SqlitePool>) -> Result<String, Error> {
-    //     //let nonce = u32::from_str(nonce.as_str())?;
-    //     let client = reqwest::Client::new();
-    //     let mut tx = pool.begin().await.map_err(crate::db::Error::Sqlx)?;
-    //     let current_target = tx.select_current_target().await?;
-    //     let block_height_response = client
-    //         .get(format!(
-    //             "https://mempool.space/api/block-height/{}",
-    //             current_target.block
-    //         ))
-    //         .send()
-    //         .await?;
-    //     if block_height_response.status().is_success() {
-    //         let block_hash = block_height_response.text().await?;
-    //         let block_response = client
-    //             .get(format!("https://mempool.space/api/block/{}", block_hash))
-    //             .send()
-    //             .await?;
-    //         if block_response.status().is_success() {
-    //             let block: Block = block_response.json().await?;
-    //             let nonce = block.nonce;
-    //             tx.set_current_nonce(nonce).await?;
-    //             tx.set_guesses_block(block.height).await?;
-    //             tx.commit().await.map_err(crate::db::Error::Sqlx)?;
-    //             return Ok(nonce.to_string());
-    //         }
-    //     }
-    //     Ok(String::default())
-    // }
 }
 
 mod post {
-    use super::*;
     use crate::error::Error;
+    use crate::model::{sort_guesses_by_target_diff, Target};
     use crate::web::auth::AuthSession;
     use crate::web::auth::{self, Permission};
     use crate::{db::Db, web::template};
@@ -119,36 +105,42 @@ mod post {
 
                 let uuid = player.uuid;
                 let mut tx = pool.begin().await.expect("tx");
-                let player_name = tx.select_player_name(&uuid).await.ok();
+                let _player_name = tx.select_player_name(&uuid).await.ok();
                 let target = tx.select_current_target().await.ok();
 
                 // add guess
-                let block = target.as_ref().map(|t| t.block);
                 let nonce = u32::from_str_radix(guess.as_str(), 16)?;
-                tx.insert_guess(&uuid, block, nonce)
+                tx.insert_guess(&uuid, nonce)
                     .await
                     .map_err(|e| Error::Db(e))?;
                 tx.commit().await.expect("commit");
 
                 let mut tx = pool.begin().await.expect("tx");
-                let guesses = if let Some(some_target) = &target {
-                    tx.select_block_guesses(some_target.block).await.ok()
-                } else {
-                    tx.select_guesses().await.ok()
-                }
-                .unwrap_or_default();
-
-                let my_guess = Some(Guess {
-                    uuid,
-                    block,
-                    name: player_name.clone().unwrap(),
-                    nonce,
-                });
+                let guesses = match &target {
+                    Some(Target { block:_, nonce: None }) => tx
+                        .select_guesses()
+                        .await
+                        .ok()
+                        .unwrap_or_default(),
+                    Some(Target {
+                        block,
+                        nonce: Some(nonce),
+                    }) => {
+                        let mut guesses = tx
+                            .select_block_guesses(*block)
+                            .await
+                            .ok()
+                            .unwrap_or_default();
+                        sort_guesses_by_target_diff(&mut guesses, *nonce);
+                        guesses
+                    }
+                    None => tx.select_guesses().await.ok().unwrap_or_default(),
+                };
 
                 Ok(template::home::home_page(
                     target,
                     change_target,
-                    my_guess.map(|g| g.nonce),
+                    Some(nonce),
                     guesses,
                 )
                 .into_response())
