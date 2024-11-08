@@ -54,19 +54,18 @@ pub trait Db {
     async fn select_roles(&mut self, cred_id: &Uuid) -> Result<HashSet<Role>, Error>;
 
     /// Insert new target block.
-    async fn insert_target(&mut self, block: u32) -> Result<(), Error>;
+    async fn update_target(&mut self, block: u32) -> Result<(), Error>;
 
     /// Select current target block.
     async fn select_current_target(&mut self) -> Result<Target, Error>;
 
-    /// Set current target block nonce.
-    async fn set_current_nonce(&mut self, nonce: u32) -> Result<(), Error>;
+    /// Set target block nonce.
+    async fn set_target_nonce(&mut self, block: u32, nonce: u32) -> Result<(), Error>;
 
     /// Insert new nonce guess.
     async fn insert_guess(
         &mut self,
         uuid: &Uuid,
-        block: Option<u32>,
         nonce: u32,
     ) -> Result<(), Error>;
 
@@ -263,7 +262,13 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .map(|roles| roles.into_iter().collect())
     }
 
-    async fn insert_target(&mut self, block: u32) -> Result<(), Error> {
+    async fn update_target(&mut self, block: u32) -> Result<(), Error> {
+        let query = sqlx::query("DELETE FROM target WHERE nonce IS NULL");
+        query
+            .execute(&mut **self)
+            .await
+            .expect("always able to delete targets without nonce");
+
         let query = sqlx::query("INSERT INTO target (block, nonce) VALUES (?, NULL)").bind(block);
         query
             .execute(&mut **self)
@@ -283,11 +288,10 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .map(|tr| tr.0)
     }
 
-    async fn set_current_nonce(&mut self, nonce: u32) -> Result<(), Error> {
-        let query = sqlx::query(
-            "UPDATE target SET nonce = ? WHERE block IS (SELECT MAX(block) FROM target)",
-        )
-        .bind(nonce);
+    async fn set_target_nonce(&mut self, block: u32, nonce: u32) -> Result<(), Error> {
+        let query = sqlx::query("UPDATE target SET nonce = ? WHERE block IS ?")
+            .bind(nonce)
+            .bind(block);
         query
             .execute(&mut **self)
             .await
@@ -298,12 +302,10 @@ impl<'c> Db for Transaction<'c, Sqlite> {
     async fn insert_guess(
         &mut self,
         uuid: &Uuid,
-        block: Option<u32>,
         nonce: u32,
     ) -> Result<(), Error> {
-        let query = sqlx::query("INSERT INTO guess (uuid, block, nonce) VALUES (?, ?, ?)")
+        let query = sqlx::query("INSERT INTO guess (uuid, block, nonce) VALUES (?, NULL, ?)")
             .bind(uuid.to_string())
-            .bind(block)
             .bind(nonce);
         query
             .execute(&mut **self)

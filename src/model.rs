@@ -36,13 +36,13 @@ pub struct Block {
     pub nonce: u32,
 }
 
-// pub fn sort_guesses_by_target_diff(guesses: &mut [Guess], target_nonce: u32) {
-//     guesses.sort_by(|a, b| {
-//         let target_a = target_nonce.abs_diff(a.nonce);
-//         let target_b = target_nonce.abs_diff(b.nonce);
-//         target_a.cmp(&target_b)
-//     })
-// }
+pub fn sort_guesses_by_target_diff(guesses: &mut [Guess], target_nonce: u32) {
+    guesses.sort_by(|a, b| {
+        let target_a = target_nonce.abs_diff(a.nonce);
+        let target_b = target_nonce.abs_diff(b.nonce);
+        target_a.cmp(&target_b)
+    })
+}
 
 // pub fn sort_guesses_by_nonce(guesses: &mut [Guess]) {
 //     guesses.sort_by_key(|g| g.nonce)

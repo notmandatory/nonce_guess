@@ -185,8 +185,8 @@ async fn update_target_nonce(pool: SqlitePool) -> Result<(), Error> {
                 let block: Block = block_response.json().await?;
                 let nonce = block.nonce;
                 let mut tx = pool.begin().await.map_err(crate::db::Error::Sqlx)?;
-                tx.set_current_nonce(nonce).await?;
-                tx.set_guesses_block(block.height).await?;
+                tx.set_target_nonce(current_target.block, nonce).await?;
+                tx.set_guesses_block(current_target.block).await?;
                 tx.commit().await.map_err(crate::db::Error::Sqlx)?;
             }
         }
