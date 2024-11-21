@@ -7,6 +7,8 @@
 
 ### Local Testing
 
+> **Pre-requisite dependencies: `rustup target add wasm32-unknown-unknown && cargo install trunk`
+
 1. Start the wasm web client builder in watch mode
    ```shell
    cd ng_web
