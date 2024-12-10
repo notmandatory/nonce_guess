@@ -3,7 +3,7 @@ use maud::{html, Markup};
 use super::base;
 
 // login page template
-pub fn login_page(_next: Option<String>) -> Markup {
+pub fn login_page() -> Markup {
     let head = html! {
         script src="assets/auth.js" async="true" {}
     };
@@ -38,9 +38,6 @@ pub fn login_page(_next: Option<String>) -> Markup {
     //                 }
     //                 div ."py-1.5"."leading-6"."gap-6"."text-green-600"."font-semibold" {
     //                     p #"flash_message";
-    //                 }
-    //                 @if  let Some(next) = next {
-    //                     input type="hidden" name="next" value=(next);
     //                 }
     //             }
     //
@@ -99,7 +96,6 @@ pub fn login_page(_next: Option<String>) -> Markup {
                     div ."py-1.5"."leading-6"."gap-6"."text-green-600"."font-semibold" {
                         p #"flash_message";
                     }
-                    input type="hidden" name="next" value="/";
                 }
                 p ."mt-5"."text-center"."text-sm"."text-gray-500" {
                     "No account? register with your "

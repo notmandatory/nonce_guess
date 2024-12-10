@@ -124,9 +124,6 @@ function login() {
                                     flash_message.classList.add('text-green-600');
                                     flash_message.classList.remove('hidden');
                                     flash_message.innerHTML = "Successfully logged in,";
-                                    const urlParams = new URLSearchParams(window.location.search);
-                                    const next = urlParams.get('next');
-                                    location.href = next || "/";
                                 } else {
                                     flash_message.classList.add('text-red-600');
                                     flash_message.classList.remove('hidden');

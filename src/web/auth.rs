@@ -1,5 +1,4 @@
 use super::template::login::login_page;
-use axum::extract::Query;
 use axum::http::HeaderValue;
 use axum::routing::{get, post};
 use axum::{
@@ -11,7 +10,6 @@ use axum::{
 use axum_login::axum::async_trait;
 use axum_login::{AuthUser, AuthnBackend, AuthzBackend, UserId};
 use maud::Markup;
-use serde::Deserialize;
 use sqlx::{Pool, Sqlite, SqlitePool};
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -31,13 +29,6 @@ use crate::model::Player;
 use crate::web::auth::Error::UserAlreadyRegistered;
 use webauthn_rs::prelude::*;
 
-// This allows us to extract the "next" field from the query string. We use this
-// to redirect after log in.
-#[derive(Debug, Deserialize)]
-pub struct NextUrl {
-    next: Option<String>,
-}
-
 pub fn router() -> Router<SqlitePool> {
     Router::new()
         .route("/login", get(login))
@@ -48,8 +39,8 @@ pub fn router() -> Router<SqlitePool> {
         .route("/logout", get(logout))
 }
 
-pub async fn login(Query(NextUrl { next }): Query<NextUrl>) -> Markup {
-    login_page(next)
+pub async fn login() -> Markup {
+    login_page()
 }
 
 // 2. The first step a client (user) will carry out is requesting a credential to be
@@ -436,7 +427,6 @@ pub async fn finish_authentication(
 // ) -> impl IntoResponse {
 //     let _player = auth_session.logout().await.expect("logout");
 //     HtmlTemplate(LoginTemplate {
-//         next: None
 //     })
 // }
 

@@ -1,4 +1,3 @@
-use crate::model::Guess;
 use axum::routing::post;
 use axum::{http::StatusCode, routing::get, Router};
 use sqlx::SqlitePool;
