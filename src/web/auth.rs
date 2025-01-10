@@ -1,4 +1,3 @@
-use super::template::login::login_page;
 use axum::http::HeaderValue;
 use axum::routing::{get, post};
 use axum::{
@@ -13,6 +12,7 @@ use maud::Markup;
 use sqlx::{Pool, Sqlite, SqlitePool};
 use std::collections::HashSet;
 use std::sync::Arc;
+use askama::Template;
 use tower_sessions::Session;
 use tracing::{debug, error, info};
 use uuid::Uuid;
@@ -25,22 +25,45 @@ use uuid::Uuid;
 // 1. Import the prelude - this contains everything needed for the server to function.
 use crate::db;
 use crate::db::Db;
-use crate::model::Player;
 use crate::web::auth::Error::UserAlreadyRegistered;
 use webauthn_rs::prelude::*;
 
+/// The players login information
+#[derive(Debug, Clone)]
+pub struct Player {
+    pub(crate) uuid: Uuid,
+    pub(crate) name: String,
+    pub(crate) password_hash: String,
+    pub(crate) passkeys: Vec<Passkey>,
+}
+
 pub fn router() -> Router<SqlitePool> {
     Router::new()
-        .route("/login", get(login))
-        .route("/register_start/:username", post(start_register))
-        .route("/register_finish", post(finish_register))
-        .route("/login_start/:username", post(start_authentication))
-        .route("/login_finish", post(finish_authentication))
+        .route("/login", get(login_page))
+        .route("/login", post(login_password))
+        .route("/register", post(register_password))
+        .route("/start_register_passkey/:username", post(start_register_passkey))
+        .route("/finish_register_passkey", post(finish_register_passkey))
+        .route("/start_login_passkey/:username", post(start_login_passkey))
+        .route("/finish_login_passkey", post(finish_login_passkey))
         .route("/logout", get(logout))
 }
 
-pub async fn login() -> Markup {
-    login_page()
+/// login page template
+#[derive(Template)]
+#[template(path = "login.html")]
+struct LoginTemplate {}
+
+async fn login_page() -> LoginTemplate {
+    LoginTemplate {}
+}
+
+async fn login_password() -> Markup {
+    todo!()
+}
+
+async fn register_password() -> Markup {
+    todo!()
 }
 
 // 2. The first step a client (user) will carry out is requesting a credential to be
@@ -77,7 +100,7 @@ pub async fn login() -> Markup {
 // In this step, we are responding to the start reg(istration) request, and providing
 // the challenge to the browser.
 
-pub async fn start_register(
+async fn start_register_passkey(
     auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Path(username): Path<String>,
@@ -166,7 +189,7 @@ pub async fn start_register(
 // on their device. Now we have the registration options sent to us, and we need
 // to verify these and persist them.
 
-pub async fn finish_register(
+async fn finish_register_passkey(
     auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Json(reg): Json<RegisterPublicKeyCredential>,
@@ -268,7 +291,7 @@ pub async fn finish_register(
 //
 // The user indicates the wish to start authentication and we need to provide a challenge.
 
-pub async fn start_authentication(
+async fn start_login_passkey(
     auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Path(username): Path<String>,
@@ -346,7 +369,7 @@ pub async fn start_authentication(
 // a success. If the browser does not complete this call, or *any* error occurs,
 // this is an authentication failure.
 
-pub async fn finish_authentication(
+async fn finish_login_passkey(
     mut auth_session: axum_login::AuthSession<Backend>,
     session: Session,
     Json(auth): Json<PublicKeyCredential>,
@@ -430,7 +453,7 @@ pub async fn finish_authentication(
 //     })
 // }
 
-pub async fn logout(mut auth_session: AuthSession) -> impl IntoResponse {
+async fn logout(mut auth_session: AuthSession) -> impl IntoResponse {
     match auth_session.logout().await {
         Ok(_) => {
             let mut response = StatusCode::OK.into_response();

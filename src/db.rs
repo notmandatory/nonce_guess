@@ -1,4 +1,5 @@
-use crate::model::{Guess, Player, Target};
+use crate::model::{Guess, Target};
+use crate::web::auth::Player;
 use crate::web::auth::{Permission, Role};
 use axum::async_trait;
 use sqlx::sqlite::SqliteRow;
@@ -114,10 +115,12 @@ impl<'c> Db for Transaction<'c, Sqlite> {
 
         if let Some(name) = name {
             let uuid = uuid.clone();
+            let password_hash = "".to_string();
             let passkeys = self.select_player_passkeys(&uuid).await?;
             Ok(Some(Player {
                 uuid,
                 name,
+                password_hash,
                 passkeys,
             }))
         } else {

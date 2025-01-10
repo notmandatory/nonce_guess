@@ -1,4 +1,4 @@
-function register() {
+function register_passkey() {
     const flash_message = document.getElementById('flash_message');
     flash_message.classList.add('hidden');
     flash_message.classList.remove('text-green-600');
@@ -13,7 +13,7 @@ function register() {
         return;
     }
 
-    fetch('/register_start/' + encodeURIComponent(username), {
+    fetch('/start_register_passkey/' + encodeURIComponent(username), {
         method: 'POST'
     })
         .then((response) => {
@@ -41,7 +41,7 @@ function register() {
             });
         })
         .then((credential) => {
-            fetch('/register_finish', {
+            fetch('/finish_register_passkey', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -70,7 +70,7 @@ function register() {
         })
 }
 
-function login() {
+function login_passkey() {
     const flash_message = document.getElementById('flash_message');
     flash_message.classList.add('hidden');
     flash_message.classList.remove('text-green-600');
@@ -84,7 +84,7 @@ function login() {
         return;
     }
 
-    fetch('/login_start/' + encodeURIComponent(username.value), {
+    fetch('/start_login_passkey/' + encodeURIComponent(username.value), {
         method: 'POST'
     })
         .then(response => {
@@ -102,7 +102,7 @@ function login() {
                         });
                     })
                     .then((assertion) => {
-                        fetch('/login_finish', {
+                        fetch('/finish_login_passkey', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json'

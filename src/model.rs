@@ -4,13 +4,7 @@ pub use serde;
 use uuid::Uuid;
 use webauthn_rs::prelude::Passkey;
 
-/// The players login information
-#[derive(Debug, Clone)]
-pub struct Player {
-    pub(crate) uuid: Uuid,
-    pub(crate) name: String,
-    pub(crate) passkeys: Vec<Passkey>,
-}
+
 
 /// The target block that players are trying to guess the nonce for.
 #[derive(Serialize, Deserialize, Default, Debug, Clone, Eq, PartialEq)]

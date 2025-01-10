@@ -1,5 +1,4 @@
 pub(crate) mod home;
-pub(crate) mod login;
 
 use maud::{html, Markup, DOCTYPE};
 

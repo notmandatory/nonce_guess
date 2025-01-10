@@ -1,4 +1,4 @@
-CREATE TABLE player (uuid TEXT NOT NULL UNIQUE, name TEXT NOT NULL UNIQUE);
+CREATE TABLE player (uuid TEXT NOT NULL UNIQUE, name TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL);
 CREATE TABLE authn (cred_id BLOB NOT NULL UNIQUE, uuid TEXT NOT NULL REFERENCES player (uuid), passkey BLOB NOT NULL);
 CREATE TABLE authz (uuid TEXT NOT NULL REFERENCES player (uuid), permission TEXT NOT NULL, UNIQUE(uuid, permission));
 CREATE TABLE player_role (uuid TEXT NOT NULL REFERENCES player (uuid), role TEXT NOT NULL, UNIQUE(uuid, role));
