@@ -1,0 +1,17 @@
+{% extends "base.html" %} {% block title %}Login{% endblock %} {% block content
+%}
+<section
+  id="home"
+  class="mb-6 flex scroll-mt-10 flex-col-reverse items-center justify-center gap-8 p-6"
+>
+  <h1>HOME PAGE!</h1>
+  <div class="mt-6 flex items-center justify-center gap-x-6">
+    <button
+      class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 group-invalid:pointer-events-none group-invalid:opacity-30"
+      hx-get="/logout"
+    >
+      Logout
+    </button>
+  </div>
+</section>
+{% endblock %}

@@ -6,8 +6,6 @@ use sqlx::sqlite::SqliteRow;
 use sqlx::{FromRow, Row, Sqlite, Transaction};
 use std::collections::HashSet;
 use std::str::FromStr;
-use uuid::Uuid;
-use webauthn_rs::prelude::Passkey;
 
 #[async_trait]
 pub trait Db {
@@ -64,11 +62,7 @@ pub trait Db {
     async fn set_target_nonce(&mut self, block: u32, nonce: u32) -> Result<(), Error>;
 
     /// Insert new nonce guess.
-    async fn insert_guess(
-        &mut self,
-        uuid: &Uuid,
-        nonce: u32,
-    ) -> Result<(), Error>;
+    async fn insert_guess(&mut self, uuid: &Uuid, nonce: u32) -> Result<(), Error>;
 
     /// Select guesses for target block.
     async fn select_block_guesses(&mut self, block: u32) -> Result<Vec<Guess>, Error>;
@@ -302,11 +296,7 @@ impl<'c> Db for Transaction<'c, Sqlite> {
             .map(|_| ())
     }
 
-    async fn insert_guess(
-        &mut self,
-        uuid: &Uuid,
-        nonce: u32,
-    ) -> Result<(), Error> {
+    async fn insert_guess(&mut self, uuid: &Uuid, nonce: u32) -> Result<(), Error> {
         let query = sqlx::query("INSERT INTO guess (uuid, block, nonce) VALUES (?, NULL, ?)")
             .bind(uuid.to_string())
             .bind(nonce);
@@ -412,8 +402,6 @@ impl FromRow<'_, SqliteRow> for Role {
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    #[error("sqlx: {0}")]
-    Sqlx(#[from] sqlx::Error),
     #[error("uuid: {0}")]
     Uuid(#[from] uuid::Error),
     #[error("cbor serialize: {0}")]

@@ -1,29 +1,8 @@
-{% extends "base.html" %} {% block title %}Login{% endblock %} {% block content
-%}
 <section
-  id="login"
-  class="mb-6 flex scroll-mt-10 flex-col-reverse items-center justify-center gap-8 p-6">
-  <article>
-    <h2
-      class="max-w-md text-center text-4xl font-bold text-slate-900 dark:text-white"
-    >
-      Guess the
-      <span class="text-indigo-700 dark:text-indigo-300">Block Nonce </span>
-      Win a Prize!
-    </h2>
-  </article>
-  <img
-    class="h-20 w-auto"
-    src="../assets/apple-touch-icon.png"
-    alt="Nonce Guess Logo"
-  />
-</section>
-{% if !register_form -%}
-<section
-  id="login_form"
+  id="register_form"
   class="flex scroll-mt-10 flex-col items-center justify-center gap-4 p-6"
 >
-  <form id="group" novalidate hx-post="/login">
+  <form id="group" novalidate hx-post="/register">
     <div class="mb-1 mt-6">
       <label
         class="text-l text-left font-bold text-slate-900 dark:text-white"
@@ -43,7 +22,7 @@
         class="hidden w-60 gap-6 py-1.5 font-semibold leading-6 text-red-600 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
       >
         <p id="name_error_message">
-          Must be 3-20 characters and only include upper or lowercase A-Z, 0-9, and underscore.
+          Must be 3-20 characters and only include A-Z, 0-9, and underscore.
         </p>
       </div>
     </div>
@@ -75,6 +54,27 @@
           ].
         </p>
       </div>
+      <div class="mb-1 mt-6">
+        <label
+          class="mt-6 text-l text-left font-bold text-slate-900 dark:text-white"
+          for="password_confirm"
+        >Confirm Password</label
+        >
+        <input
+          id="password_confirm"
+          class="peer mt-2 block w-60 rounded-md py-1.5 text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+          name="password_confirm"
+          type="password"
+          autocomplete="off"
+          required
+          placeholder
+          pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_])[A-Za-z\d@$!%*?&#^_]{8,20}"
+        />
+        <button id="show_confirm" name="show_confirm" type="button"
+                hx-on:click="togglePassword('show_confirm','password_confirm')">
+          Show
+        </button>
+      </div>
       {% if let Some(next) = next %}
       <input type="hidden" name="next" value="{{next}}" />
       {% endif %}
@@ -84,37 +84,18 @@
         class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 group-invalid:pointer-events-none group-invalid:opacity-30"
         type="submit"
       >
-        Sign in
+        Register
       </button>
       <button
         class="flex justify-center rounded-md bg-indigo-300 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 shadow-sm hover:bg-indigo-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 group-invalid:pointer-events-none group-invalid:opacity-30 dark:bg-indigo-300 dark:hover:bg-indigo-200"
-        hx-get="/register" hx-push-url='{{ Self::push_url(self,"register") }}' hx-swap="outerHTML" hx-target="#login_form" hx-select="#register_form"
+        hx-get="/login" hx-push-url='{{ Self::push_url(self,"login") }}' hx-swap="outerHTML" hx-target="#register_form"
+        hx-select="#login_form"
       >
-        Register
+        Cancel
       </button>
     </div>
   </form>
   <div class="gap-6 py-1.5 font-semibold leading-6 text-green-600">
     <p id="flash_message"></p>
   </div>
-  <p class="mt-5 text-center text-sm text-gray-500">
-    No account? click register.
-  </p>
 </section>
-{% else -%}
-{% include "register_form.html" %}
-{% endif -%}
-<script>
-  function togglePassword(button_name, password_name) {
-    let show = document.querySelector("button[name=" + button_name + "]");
-    let password = document.querySelector("input[name=" + password_name + "]");
-    if (password.getAttribute("type") === "password") {
-      password.setAttribute("type", "text");
-      show.innerHTML = "Hide";
-    } else {
-      password.setAttribute("type", "password");
-      show.innerHTML = "Show";
-    }
-  }
-</script>
-{% endblock %}

@@ -1,5 +1,6 @@
 use axum::response::IntoResponse;
 use clap::Parser;
+use std::path::PathBuf;
 use tracing::debug;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
@@ -13,11 +14,12 @@ use tracing_subscriber::EnvFilter;
 // };
 use crate::web::App;
 
-mod db;
+//mod db;
 mod error;
 mod model;
 // mod startup;
-mod web;
+mod session_store;
+pub mod web;
 
 /// Nonce Guess Server CLI arguments
 #[derive(Parser, Debug)]
@@ -46,10 +48,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .try_init()?;
 
-    // TODO is "?mode=rwc" required? Yes
     // get database URL from env
-    let database_url = std::env::var("NONCE_GUESS_DB_URL").ok();
-    debug!("database_url: {:?}", &database_url);
+    let database_file = std::env::var("NONCE_GUESS_DB_FILE")
+        .ok()
+        .map(|path| PathBuf::from(path));
+    debug!("database_file: {:?}", &database_file);
 
     // get effective public domainname from env
     let domain_name = std::env::var("NONCE_GUESS_DOMAIN_NAME").unwrap_or("localhost".to_string());
@@ -60,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::env::var("NONCE_GUESS_WEB_URL").unwrap_or("http://localhost:8081".to_string());
     debug!("web_url: {:?}", &web_url);
 
-    App::new(database_url)
+    App::new(database_file)
         .await?
         .serve(domain_name, web_url)
         .await

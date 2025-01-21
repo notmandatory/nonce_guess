@@ -1,5 +1,3 @@
-use maud::{html, Markup};
-
 use super::base;
 use crate::model::{Guess, Target};
 
