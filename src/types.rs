@@ -61,6 +61,8 @@ pub enum InternalError {
     RedbCommit(#[from] redb::CommitError),
     #[error(transparent)]
     Join(#[from] tokio::task::JoinError),
+    #[error(transparent)]
+    Reqwest(#[from] reqwest::Error),
 }
 
 impl IntoResponse for InternalError {

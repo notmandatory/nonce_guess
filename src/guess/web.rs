@@ -30,7 +30,7 @@ pub fn router() -> Router<Arc<AppState>> {
 #[derive(Template)]
 #[template(path = "home.html")]
 pub struct HomeTemplate {
-    target: Option<(u32, Option<String>)>,
+    target: Option<(u32, Option<u32>)>,
     change_target: bool,
     guesses: Vec<GuessTableData>,
     add_guess: bool,
@@ -96,7 +96,7 @@ pub async fn home(
         }
     }
 
-    let target = target.map(|(height, nonce)| (height, nonce.map(|nonce| format!("{:x}", nonce))));
+    //let target = target.map(|(height, nonce)| (height, nonce.map(|nonce| format!("{:x}", nonce))));
     let change_target = all_permissions.contains(&Permission::ChangeTarget);
     Ok(HomeTemplate {
         target,

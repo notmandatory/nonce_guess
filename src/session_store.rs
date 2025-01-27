@@ -25,6 +25,7 @@ pub struct RedbSessionStore {
 impl RedbSessionStore {
     /// Create a new RedbStore using a [`Database`]
     pub fn new(db: Arc<Database>) -> Self {
+        // TODO: call session store database migrations here
         Self { db }
     }
 

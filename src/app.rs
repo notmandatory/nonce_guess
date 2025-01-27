@@ -1,5 +1,5 @@
 use crate::auth::backend::AuthBackend;
-use crate::guess::backend::GuessBackend;
+use crate::guess::backend::{continuously_update_target_nonce, GuessBackend};
 use crate::session_store::RedbSessionStore;
 use crate::{auth, guess};
 use axum::Router;
@@ -60,12 +60,6 @@ impl App {
         // as a request extension.
         let session_store = RedbSessionStore::new(self.db.clone());
 
-        // TODO: call session store database migrations here
-
-        // TODO: put this back in
-        // task to update block hash when confirmed
-        // let update_task = tokio::task::spawn(continuously_update_target_nonce(self.pool.clone()));
-
         // task to delete expired sessions
         let delete_task = tokio::task::spawn(
             session_store
@@ -92,6 +86,9 @@ impl App {
         let auth_layer = AuthManagerLayerBuilder::new(auth_backend, session_layer).build();
 
         let guess_backend = GuessBackend::new(self.db.clone()).map(|gb| Arc::new(gb))?;
+        // task to update block hash when confirmed
+        let update_task = tokio::task::spawn(continuously_update_target_nonce(guess_backend.clone()));
+
         let app_state = Arc::new(AppState { guess_backend });
 
         let router = Router::new()
@@ -106,7 +103,7 @@ impl App {
         // Ensure we use a shutdown signal to abort the tasks.
         axum::serve(listener, router.into_make_service())
             .with_graceful_shutdown(shutdown_signal(vec![
-                //update_task.abort_handle(),
+                update_task.abort_handle(),
                 delete_task.abort_handle(),
             ]))
             .await?;
@@ -144,49 +141,3 @@ async fn shutdown_signal(task_abort_handles: Vec<AbortHandle>) {
             },
     }
 }
-
-// async fn continuously_update_target_nonce(pool: SqlitePool) -> Result<(), Error> {
-//     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
-//     interval.tick().await; // The first tick completes immediately; skip.
-//     loop {
-//         interval.tick().await;
-//         if let Err(e) = update_target_nonce(pool.clone()).await {
-//             error!("update target error: {:?}", e);
-//         }
-//     }
-// }
-
-// async fn update_target_nonce(pool: SqlitePool) -> Result<(), Error> {
-//     let mut tx = pool.begin().await.map_err(crate::db::Error::Sqlx)?;
-//     let current_target = tx.select_current_target().await?;
-//     tx.commit().await.map_err(crate::db::Error::Sqlx)?;
-//     if current_target.nonce.is_none() {
-//         let client = reqwest::Client::builder()
-//             .use_native_tls()
-//             .danger_accept_invalid_certs(true)
-//             .build()?;
-//         let block_height_response = client
-//             .get(format!(
-//                 "https://mempool.space/api/block-height/{}",
-//                 current_target.block
-//             ))
-//             .send()
-//             .await?;
-//         if block_height_response.status().is_success() {
-//             let block_hash = block_height_response.text().await?;
-//             let block_response = client
-//                 .get(format!("https://mempool.space/api/block/{}", block_hash))
-//                 .send()
-//                 .await?;
-//             if block_response.status().is_success() {
-//                 let block: Block = block_response.json().await?;
-//                 let nonce = block.nonce;
-//                 let mut tx = pool.begin().await.map_err(crate::db::Error::Sqlx)?;
-//                 tx.set_target_nonce(current_target.block, nonce).await?;
-//                 tx.set_guesses_block(current_target.block).await?;
-//                 tx.commit().await.map_err(crate::db::Error::Sqlx)?;
-//             }
-//         }
-//     }
-//     Ok(())
-// }

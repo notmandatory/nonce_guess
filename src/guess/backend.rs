@@ -1,4 +1,4 @@
-use crate::guess::types::{Guess, GuessError};
+use crate::guess::types::{Block, Guess, GuessError};
 use crate::types::InternalError;
 use redb::{
     Database, MultimapTableDefinition, MultimapValue, ReadTransaction, ReadableTable,
@@ -259,5 +259,46 @@ impl GuessBackend {
                     .collect::<Vec<Guess>>()
             })
             .map_err(Into::<InternalError>::into)
+    }
+}
+
+pub async fn continuously_update_target_nonce(guess_backend: Arc<GuessBackend>) -> Result<(), InternalError> {
+    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+    interval.tick().await; // The first tick completes immediately; skip.
+    loop {
+        interval.tick().await;
+        update_target_nonce(guess_backend.clone())
+            .await
+            .map_err(Into::<InternalError>::into)?
+    }
+}
+
+async fn update_target_nonce(guess_backend: Arc<GuessBackend>) -> Result<(), InternalError> {
+    if let Some((height, None)) = guess_backend.get_last_target_nonce().await? {
+        let client = reqwest::Client::builder()
+            .use_native_tls()
+            .danger_accept_invalid_certs(true)
+            .build()?;
+        let block_height_response = client
+            .get(format!("https://mempool.space/api/block-height/{}", height))
+            .send()
+            .await?;
+        if block_height_response.status().is_success() {
+            let block_hash = block_height_response.text().await?;
+            let block_response = client
+                .get(format!("https://mempool.space/api/block/{}", block_hash))
+                .send()
+                .await?;
+            if block_response.status().is_success() {
+                let block: Block = block_response.json().await?;
+                let nonce = block.nonce;
+                guess_backend.insert_target(height, Some(nonce)).await?;
+                info!("updated target nonce for height {} to {}", height, nonce);
+            }
+        }
+        info!("checked target nonce for height {}", height);
+        Ok::<(), InternalError>(())
+    } else {
+        Ok::<(), InternalError>(())
     }
 }
