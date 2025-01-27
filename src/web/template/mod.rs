@@ -1,5 +1,3 @@
-pub(crate) mod home;
-
 use maud::{html, Markup, DOCTYPE};
 
 // base for all page templates

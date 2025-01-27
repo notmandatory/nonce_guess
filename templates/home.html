@@ -2,12 +2,172 @@
 %}
 <section
   id="home"
-  class="mb-6 flex scroll-mt-10 flex-col-reverse items-center justify-center gap-8 p-6"
+  class="mb-6 flex scroll-mt-10 flex-col items-center justify-center gap-8 p-6"
 >
   <h1>HOME PAGE!</h1>
+
+  {% if let Some((height, nonce)) = target %}
+  {% let nonce = nonce.clone().unwrap_or("None".to_string()) %}
+  <h2>Target height: {{ height }}, nonce: {{ nonce }}</h2>
+  {% else %}
+  <h2>No Target</h2>
+  {% endif %}
+  {% if change_target %}
+  <div id="target_form">
+    <form id="group" novalidate hx-post="/target">
+      <div class="mb-1 mt-6">
+        <label
+          class="text-l text-left font-bold text-slate-900 dark:text-white"
+          for="height"
+        >Target Block Height</label
+        >
+        <input
+          id="height"
+          class="peer mt-2 block w-60 rounded-md py-1.5 text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+          name="height"
+          type="text"
+          autocomplete="off"
+          required
+          placeholder
+          pattern="[0-9]{6,7}"
+        />
+        <div
+          class="hidden w-60 gap-6 py-1.5 font-semibold leading-6 text-red-600 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
+        >
+          <p id="target_error_message">Must be valid block height.</p>
+        </div>
+      </div>
+      <div class="mt-6 flex items-center justify-center gap-x-6">
+        <button
+          class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 group-invalid:pointer-events-none group-invalid:opacity-30"
+          type="submit"
+        >
+          Change
+        </button>
+      </div>
+    </form>
+    <div class="gap-6 py-1.5 font-semibold leading-6 text-green-600">
+      <p id="flash_message"></p>
+    </div>
+  </div>
+  {% endif %}
+  {% if add_guess %}
+  <div id="guess_form">
+    <form id="group2" novalidate hx-post="/">
+      <div class="mb-1 mt-6">
+        <label
+          class="text-l text-left font-bold text-slate-900 dark:text-white"
+          for="height"
+          >Nonce Guess</label
+        >
+        <input
+          id="guess"
+          class="peer mt-2 block w-60 rounded-md py-1.5 text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+          name="guess"
+          type="text"
+          required
+          placeholder
+          autocomplete="off"
+          pattern="[0-9a-fA-F]{8}"
+        />
+        <div
+          class="hidden w-60 gap-6 py-1.5 font-semibold leading-6 text-red-600 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
+        >
+          <p id="guess_error_message">
+            Must be 8 characters and only include a-f, A-F, and 0-9.
+          </p>
+        </div>
+      </div>
+      <div class="mt-6 flex items-center justify-center gap-x-6">
+        <button
+          class="group2-invalid:pointer-events-none group2-invalid:opacity-30 flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          type="submit"
+        >
+          Submit
+        </button>
+      </div>
+    </form>
+    <div class="gap-6 py-1.5 font-semibold leading-6 text-green-600">
+      <p id="flash_message"></p>
+    </div>
+  </div>
+  {% else if !guesses.is_empty() %}
+  <div class="flex items-center">
+    <div class="sm:flex-auto">
+      <h2 class="text-grey-900 text-lg font-semibold leading-6">
+        Current Guesses
+      </h2>
+    </div>
+  </div>
+  <div>
+    <div>
+      <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+        <div
+          class="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg"
+        >
+          <table class="min-w-full divide-y divide-gray-300">
+            <thead class="bg-gray-50">
+              <tr>
+                <th
+                  scope="col"
+                  class="py-3.5 pl-4 pr-3 text-left text-base font-semibold text-gray-900 sm:pl-6"
+                >
+                  Position
+                </th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-base font-semibold text-gray-900"
+                >
+                  Name
+                </th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-base font-semibold text-gray-900"
+                >
+                  Hex
+                </th>
+                <th
+                  scope="col"
+                  class="px-3 py-3.5 text-left text-base font-semibold text-gray-900"
+                >
+                  Decimal
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 bg-white">
+              {% for guess in guesses.iter().enumerate() %}
+              <tr>
+                <td
+                  class="whitespace-nowrap py-4 pl-4 pr-3 font-mono text-base font-medium text-gray-900 sm:pl-6"
+                >
+                  {{ guess.0 }}
+                </td>
+                <td class="whitespace-nowrap px-3 py-4 text-base text-gray-500">
+                  {{ guess.1.name }}
+                </td>
+                <td
+                  class="whitespace-nowrap px-3 py-4 font-mono text-base text-gray-500"
+                >
+                  {{ guess.1.hex }}
+                </td>
+                <td
+                  class="whitespace-nowrap px-3 py-4 font-mono text-base text-gray-500"
+                >
+                  {{ guess.1.decimal }}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="mt-6 flex items-center justify-center gap-x-6">
     <button
-      class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 group-invalid:pointer-events-none group-invalid:opacity-30"
+      class="group2-invalid:pointer-events-none group2-invalid:opacity-30 flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
       hx-get="/logout"
     >
       Logout

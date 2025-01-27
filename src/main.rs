@@ -1,3 +1,4 @@
+use crate::app::App;
 use axum::response::IntoResponse;
 use clap::Parser;
 use std::path::PathBuf;
@@ -6,20 +7,13 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-// The handlers that process the data can be found in the auth.rs file
-// This file contains the wasm client loading code and the axum routing
-// use crate::auth::{
-//     finish_authentication, finish_register, start_authentication, start_register, Backend, Error,
-//     AUTH_UUID,
-// };
-use crate::web::App;
-
-//mod db;
-mod error;
-mod model;
-// mod startup;
+pub mod app;
+pub mod auth;
+pub mod guess;
+mod protected;
+mod restricted;
 mod session_store;
-pub mod web;
+mod types;
 
 /// Nonce Guess Server CLI arguments
 #[derive(Parser, Debug)]

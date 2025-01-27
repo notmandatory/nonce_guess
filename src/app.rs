@@ -1,11 +1,10 @@
-use super::{protected, restricted};
+use crate::auth::backend::AuthBackend;
+use crate::guess::backend::GuessBackend;
 use crate::session_store::RedbSessionStore;
-use crate::web::auth;
-use crate::web::auth::Backend;
+use crate::{auth, guess};
 use axum::Router;
 use axum_embed::ServeEmbed;
 use axum_login::{
-    login_required,
     tower_sessions::{Expiry, SessionManagerLayer},
     AuthManagerLayerBuilder,
 };
@@ -25,6 +24,10 @@ struct Assets;
 
 pub struct App {
     db: Arc<Database>,
+}
+
+pub struct AppState {
+    pub guess_backend: Arc<GuessBackend>,
 }
 
 impl App {
@@ -85,23 +88,23 @@ impl App {
         //
         // This combines the session layer with our backend to establish the auth
         // service which will provide the auth session as a request extension.
-        let backend = Backend::new(self.db.clone());
-        backend.init().await?;
-        let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
+        let auth_backend = AuthBackend::new(self.db.clone())?;
+        let auth_layer = AuthManagerLayerBuilder::new(auth_backend, session_layer).build();
 
-        let app = Router::new()
-            .merge(restricted::router())
-            .merge(protected::router())
-            .route_layer(login_required!(Backend, login_url = "/login"))
+        let guess_backend = GuessBackend::new(self.db.clone()).map(|gb| Arc::new(gb))?;
+        let app_state = Arc::new(AppState { guess_backend });
+
+        let router = Router::new()
             .merge(auth::web::router())
+            .merge(guess::web::router())
             .layer(auth_layer)
-            .with_state(self.db.clone())
+            .with_state(app_state)
             .nest_service("/assets", serve_assets);
 
         let listener = tokio::net::TcpListener::bind("0.0.0.0:8081").await.unwrap();
 
         // Ensure we use a shutdown signal to abort the tasks.
-        axum::serve(listener, app.into_make_service())
+        axum::serve(listener, router.into_make_service())
             .with_graceful_shutdown(shutdown_signal(vec![
                 //update_task.abort_handle(),
                 delete_task.abort_handle(),

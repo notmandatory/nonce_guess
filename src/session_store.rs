@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 use log::warn;
-use redb;
 use redb::{Database, Key, ReadableTable, TableDefinition, TypeName, Value};
 use std::cmp::Ordering;
 use std::sync::Arc;

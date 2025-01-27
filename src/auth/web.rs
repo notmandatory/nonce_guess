@@ -1,23 +1,22 @@
-use super::AuthSession;
-use crate::web::auth::types::{LoginError, Player, RegisterError};
-use askama::Template;
+use super::backend::AuthSession;
+use super::types::{LoginError, Player, RegisterError};
+use crate::app::AppState;
 use askama_axum::IntoResponse;
-use axum::extract::{Query, State};
+use askama_axum::Template;
+use axum::extract::Query;
 use axum::http::uri::PathAndQuery;
-use axum::http::{HeaderValue, StatusCode, Uri};
+use axum::http::{HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::{get, post};
 use axum::{Form, Router};
 use axum_login::Error::Backend;
 use password_auth::generate_hash;
-use redb::Database;
 use regex::{Regex, RegexSet};
 use serde::Deserialize;
-use std::str::FromStr;
 use std::sync::Arc;
 use uuid::Uuid;
 
-pub fn router() -> Router<Arc<Database>> {
+pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/login", get(login_page))
         .route("/login", post(login_password))
@@ -130,7 +129,7 @@ async fn login_password(
 async fn register_password(
     mut auth_session: AuthSession,
     Form(register_form): Form<RegisterForm>,
-) -> Result<Response, RegisterError> {
+) -> Result<impl IntoResponse, RegisterError> {
     let name = register_form.username.clone();
     let password = register_form.password.clone();
     let password_confirm = register_form.password_confirm.clone();
@@ -151,7 +150,7 @@ async fn register_password(
             .backend
             .insert_player(&player)
             .await
-            .map_err(|e| Backend(e))?;
+            .map_err(Backend)?;
         if let Some(player) = auth_session
             .authenticate(register_form.credentials())
             .await?
@@ -174,7 +173,7 @@ async fn register_password(
 
 fn validate_name_password(name: &str, password: &str) -> Result<(), RegisterError> {
     let name_re = Regex::new(r#"[0-9a-zA-Z_]{3,20}"#).unwrap();
-    let password_re = RegexSet::new(&[
+    let password_re = RegexSet::new([
         r#".*[a-z]"#,
         r#".*[A-Z]"#,
         r#".*\d"#,
@@ -183,9 +182,9 @@ fn validate_name_password(name: &str, password: &str) -> Result<(), RegisterErro
     ])
     .unwrap();
 
-    if !name_re.is_match(&name) {
+    if !name_re.is_match(name) {
         Err(RegisterError::InvalidName)
-    } else if !password_re.matches(&password).matched_all() {
+    } else if !password_re.matches(password).matched_all() {
         Err(RegisterError::InvalidPassword)
     } else {
         Ok(())
@@ -207,7 +206,7 @@ async fn logout(mut auth_session: AuthSession) -> impl IntoResponse {
 
 #[cfg(test)]
 mod test {
-    use crate::web::auth::web::validate_name_password;
+    use crate::auth::web::validate_name_password;
 
     #[test]
     fn test_validate_name_password() {

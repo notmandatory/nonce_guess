@@ -1,4 +1,4 @@
-use super::Backend;
+use super::backend::AuthBackend;
 use askama_axum::{IntoResponse, Response};
 use axum::http::StatusCode;
 use axum_login::AuthUser;
@@ -65,6 +65,8 @@ impl Value for Player {
 // Permissions that can be granted to a player.
 #[serde_with::skip_serializing_none]
 #[derive(
+    Ord,
+    PartialOrd,
     Serialize,
     Deserialize,
     Debug,
@@ -82,7 +84,7 @@ pub enum Permission {
     /// Assign a player to the moderator role.
     AssignMod,
     /// Change the target block height.
-    ChangeTargetBlock,
+    ChangeTarget,
 }
 
 /// Role (collection of permissions) that can be granted to a player
@@ -124,48 +126,6 @@ impl Value for Role {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct UuidKey(pub Uuid);
-
-const SIZE_OF_BYTES: usize = size_of::<uuid::Bytes>();
-impl Value for UuidKey {
-    type SelfType<'a> = UuidKey;
-    type AsBytes<'a> = uuid::Bytes;
-
-    fn fixed_width() -> Option<usize> {
-        Some(SIZE_OF_BYTES)
-    }
-
-    fn from_bytes<'a>(serialized_uuid: &'a [u8]) -> Self::SelfType<'a>
-    where
-        Self: 'a,
-    {
-        debug_assert_eq!(serialized_uuid.len(), SIZE_OF_BYTES);
-        let serialized_uuid: uuid::Bytes = serialized_uuid[0..SIZE_OF_BYTES].try_into().unwrap();
-        let uuid = Uuid::from_bytes(serialized_uuid);
-        UuidKey(uuid)
-    }
-
-    fn as_bytes<'a, 'b: 'a>(uuid_key: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
-    where
-        Self: 'b,
-    {
-        *uuid_key.0.as_bytes()
-    }
-
-    fn type_name() -> TypeName {
-        TypeName::new("nonce_guess::UuidValue")
-    }
-}
-
-impl Key for UuidKey {
-    fn compare(uuid_key1: &[u8], uuid_key2: &[u8]) -> Ordering {
-        let uuid1 = Uuid::from_bytes(uuid_key1[0..SIZE_OF_BYTES].try_into().unwrap());
-        let uuid2 = Uuid::from_bytes(uuid_key2[0..SIZE_OF_BYTES].try_into().unwrap());
-        uuid1.cmp(&uuid2)
-    }
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum RegisterError {
     #[error("invalid user name")]
@@ -179,7 +139,7 @@ pub enum RegisterError {
     #[error("failed authentication for name: {0}")]
     Authentication(String),
     #[error(transparent)]
-    Internal(#[from] axum_login::Error<Backend>),
+    Internal(#[from] axum_login::Error<AuthBackend>),
 }
 
 impl IntoResponse for RegisterError {
@@ -241,39 +201,11 @@ impl IntoResponse for RegisterError {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum InternalError {
-    #[error("failed to generate new {0} uuid after {1} tries")]
-    NewUuid(String, u8),
-    #[error(transparent)]
-    RedbTable(#[from] redb::TableError),
-    #[error(transparent)]
-    RedbTransaction(#[from] redb::TransactionError),
-    #[error(transparent)]
-    RedbStorage(#[from] redb::StorageError),
-    #[error(transparent)]
-    RedbCommit(#[from] redb::CommitError),
-    #[error(transparent)]
-    Join(#[from] tokio::task::JoinError),
-}
-
-impl IntoResponse for InternalError {
-    fn into_response(self) -> Response {
-        error!("{}", self);
-        (
-            StatusCode::OK,
-            [("HX-Retarget", "#flash_message")],
-            "Internal server error.",
-        )
-            .into_response()
-    }
-}
-
-#[derive(thiserror::Error, Debug)]
 pub enum LoginError {
     #[error("failed authentication for name: {0}")]
     Authentication(String),
     #[error(transparent)]
-    Internal(#[from] axum_login::Error<Backend>),
+    Internal(#[from] axum_login::Error<AuthBackend>),
 }
 
 impl IntoResponse for LoginError {
@@ -303,10 +235,32 @@ impl IntoResponse for LoginError {
 
 #[cfg(test)]
 mod test {
-    use crate::web::auth::types::{Permission, Role, UuidKey};
+    use crate::auth::types::Permission::AssignAdm;
+    use crate::auth::types::{Permission, Player, Role};
+    use crate::types::UuidKey;
+    use password_auth::generate_hash;
     use redb::{Key, Value};
     use std::collections::HashSet;
     use uuid::Uuid;
+
+    #[test]
+    fn test_player_encode_decode() {
+        let password_hash = generate_hash("Test123$");
+        let mut permissions = HashSet::new();
+        permissions.insert(AssignAdm);
+        let mut roles = HashSet::new();
+        roles.insert(Uuid::new_v4());
+        let orig_player = Player {
+            uuid: Uuid::new_v4(),
+            name: "test".to_string(),
+            password_hash,
+            permissions,
+            roles,
+        };
+        let encoded_player = Player::as_bytes(&orig_player);
+        let decoded_player = Player::from_bytes(&encoded_player);
+        assert_eq!(orig_player, decoded_player);
+    }
 
     #[test]
     fn test_role_encode_decode() {

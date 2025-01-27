@@ -1,17 +1,18 @@
-pub mod types;
-pub mod web;
-
+use super::types::{Permission, Player, Role};
+use crate::types::{InternalError, UuidKey};
 use async_trait::async_trait;
 use axum_login::{AuthnBackend, AuthzBackend, UserId};
 use password_auth::{generate_hash, verify_password};
 use redb::TableError::TableDoesNotExist;
-use redb::{self, Database, ReadableTable, ReadableTableMetadata, TableDefinition};
+use redb::{
+    self, Database, ReadTransaction, ReadableTable, ReadableTableMetadata, TableDefinition,
+    WriteTransaction,
+};
 use std::collections::HashSet;
 use std::hash::RandomState;
 use std::sync::Arc;
 use tokio::task::spawn_blocking;
 use tracing::info;
-use types::{InternalError, Permission, Player, Role, UuidKey};
 use uuid::Uuid;
 
 const UUID_PLAYER: TableDefinition<UuidKey, Player> = TableDefinition::new("auth_uuid_player");
@@ -19,28 +20,37 @@ const NAME_UUID: TableDefinition<String, UuidKey> = TableDefinition::new("auth_p
 const UUID_ROLE: TableDefinition<UuidKey, Role> = TableDefinition::new("auth_uuid_role");
 
 #[derive(Debug, Clone)]
-pub struct Backend {
+pub struct AuthBackend {
     pub db: Arc<Database>,
 }
 
-impl Backend {
-    pub fn new(db: Arc<Database>) -> Self {
-        Self { db }
+impl AuthBackend {
+    pub fn new(db: Arc<Database>) -> Result<Self, InternalError> {
+        Self::init(&db)?;
+        Ok(Self { db })
     }
 
-    pub async fn init(&self) -> Result<Self, InternalError> {
-        let db = self.db.clone();
-        let read_txn = db.begin_read()?;
-        let uuid_role = read_txn.open_table(UUID_ROLE);
-        // if role table doesn't exist insert admin user and role
-        if let Err(TableDoesNotExist(_)) = uuid_role {
+    pub fn init(db: &Arc<Database>) -> Result<Self, InternalError> {
+        let db = db.clone();
+        let mut write_txn = db.begin_write()?;
+        let tables_empty = {
+            let mut uuid_role = write_txn.open_table(UUID_ROLE)?;
+            let mut uuid_player = write_txn.open_table(UUID_PLAYER)?;
+            let mut name_uuid = write_txn.open_table(NAME_UUID)?;
+            info!(
+                "opened tables: {}, {}, {}",
+                UUID_ROLE, UUID_PLAYER, NAME_UUID
+            );
+            uuid_role.is_empty()? && uuid_player.is_empty()? && name_uuid.is_empty()?
+        };
+        // if all tables are empty, insert admin user and admin role
+        if tables_empty {
             let role_uuid = Uuid::new_v4();
             let admin_role = Role {
                 uuid: role_uuid,
                 name: "admin".to_string(),
-                permissions: [Permission::AssignAdm, Permission::ChangeTargetBlock].into(),
+                permissions: [Permission::AssignAdm, Permission::ChangeTarget].into(),
             };
-            self.insert_role(&admin_role).await?;
             let password_hash = generate_hash("aBcD123$");
             let mut roles = HashSet::new();
             roles.insert(role_uuid);
@@ -51,65 +61,71 @@ impl Backend {
                 permissions: Default::default(),
                 roles,
             };
-            self.insert_player(&admin).await?;
+            Self::insert_role_blocking(&mut write_txn, admin_role)?;
+            Self::insert_player_blocking(&mut write_txn, admin)?;
             info!("inserted admin_role and admin user");
         }
+        write_txn.commit()?;
         Ok(Self { db })
     }
 
     pub async fn insert_player(&self, player: &Player) -> Result<Option<Player>, InternalError> {
         let db = self.db.clone();
         let player = player.clone();
-        spawn_blocking(move || Backend::insert_player_blocking(db, player)).await?
+        spawn_blocking(move || {
+            let mut write_txn = db.begin_write()?;
+            let insert_player_result = Self::insert_player_blocking(&mut write_txn, player);
+            write_txn.commit()?;
+            insert_player_result
+        })
+        .await?
     }
 
     pub fn insert_player_blocking(
-        db: Arc<Database>,
+        write_txn: &mut WriteTransaction,
         player: Player,
     ) -> Result<Option<Player>, InternalError> {
-        let write_txn = db.begin_write()?;
-        let player = {
-            let mut uuid_player = &mut write_txn.open_table(UUID_PLAYER)?;
-            let player_result = uuid_player
-                .insert(&UuidKey(player.uuid.clone()), player.clone())
-                .map(|opt| opt.map(|ag| ag.value()))
-                .map_err(Into::into);
-            let mut name_uuid = &mut write_txn.open_table(NAME_UUID)?;
-            name_uuid
-                .insert(&player.name, &UuidKey(player.uuid))
-                .map_err(Into::<InternalError>::into)?;
-            player_result
-        };
-        write_txn.commit().map(Into::into)?;
-        player
+        let name_uuid = &mut write_txn.open_table(NAME_UUID)?;
+        name_uuid
+            .insert(&player.name, &UuidKey(player.uuid))
+            .map_err(Into::<InternalError>::into)?;
+
+        let uuid_player = &mut write_txn.open_table(UUID_PLAYER)?;
+        uuid_player
+            .insert(&UuidKey(player.uuid), player.clone())
+            .map(|opt| opt.map(|ag| ag.value()))
+            .map_err(Into::into)
     }
 
     pub async fn get_player_by_uuid(&self, uuid: &Uuid) -> Result<Option<Player>, InternalError> {
         let db = self.db.clone();
-        let uuid_key = UuidKey(uuid.clone());
-        spawn_blocking(move || Backend::get_player_by_uuid_blocking(db, uuid_key)).await?
+        let uuid_key = UuidKey(*uuid);
+        spawn_blocking(move || {
+            let read_txn = db.begin_read()?;
+            Self::get_player_by_uuid_blocking(&read_txn, uuid_key)
+        })
+        .await?
     }
 
     fn get_player_by_uuid_blocking(
-        db: Arc<Database>,
+        read_txn: &ReadTransaction,
         uuid_key: UuidKey,
     ) -> Result<Option<Player>, InternalError> {
-        let read_txn = db.begin_read()?;
         let uuid_player = read_txn.open_table(UUID_PLAYER)?;
         let opt_player = uuid_player.get(&uuid_key)?.map(|ag| ag.value());
         Ok(opt_player)
     }
 
-    pub async fn get_player_by_name(&self, name: &String) -> Result<Option<Player>, InternalError> {
+    pub async fn get_player_by_name(&self, name: &str) -> Result<Option<Player>, InternalError> {
         let db = self.db.clone();
-        let name = name.clone();
+        let name = name.to_owned();
         spawn_blocking(move || {
             let read_txn = db.begin_read()?;
             let name_player_uuid = read_txn.open_table(NAME_UUID)?;
             let player = name_player_uuid
                 .get(&name)?
                 .map(|ag| ag.value().0)
-                .map(|uuid| Backend::get_player_by_uuid_blocking(db, UuidKey(uuid)))
+                .map(|uuid| Self::get_player_by_uuid_blocking(&read_txn, UuidKey(uuid)))
                 .transpose()
                 .map(|p| p.flatten())?;
             Ok::<Option<Player>, InternalError>(player)
@@ -134,40 +150,54 @@ impl Backend {
         .await?
     }
 
+    pub async fn get_player_permissions(
+        &self,
+        player: &Player,
+    ) -> Result<HashSet<Permission>, InternalError> {
+        let mut permissions = player.permissions.clone();
+        let roles_permissions = self.get_roles_permissions(&player.roles).await?;
+        permissions.extend(roles_permissions);
+        Ok(permissions)
+    }
+
     pub async fn insert_role(&self, role: &Role) -> Result<Option<Role>, InternalError> {
         let db = self.db.clone();
         let role = role.clone();
-        spawn_blocking(move || Backend::insert_role_blocking(db, role)).await?
+        spawn_blocking(move || {
+            let mut write_txn = db.begin_write()?;
+            let insert_role_result = Self::insert_role_blocking(&mut write_txn, role);
+            write_txn.commit()?;
+            insert_role_result
+        })
+        .await?
     }
 
     pub fn insert_role_blocking(
-        db: Arc<Database>,
+        write_txn: &mut WriteTransaction,
         role: Role,
     ) -> Result<Option<Role>, InternalError> {
-        let uuid_key = UuidKey(role.uuid.clone());
-        let write_txn = db.begin_write()?;
-        let role = {
-            let mut uuid_role = write_txn.open_table(UUID_ROLE)?;
-            uuid_role
-                .insert(&uuid_key, &role)
-                .map(|opt| opt.map(|ag| ag.value()))
-                .map_err(Into::into)
-        };
-        write_txn.commit().map(Into::into)?;
-        role
+        let uuid_key = UuidKey(role.uuid);
+        let mut uuid_role = write_txn.open_table(UUID_ROLE)?;
+        uuid_role
+            .insert(&uuid_key, &role)
+            .map(|opt| opt.map(|ag| ag.value()))
+            .map_err(Into::into)
     }
 
     pub async fn get_role_by_uuid(&self, uuid: &Uuid) -> Result<Option<Role>, InternalError> {
         let db = self.db.clone();
-        let uuid_key = UuidKey(uuid.clone());
-        spawn_blocking(move || Backend::get_role_by_uuid_blocking(db, uuid_key)).await?
+        let uuid_key = UuidKey(*uuid);
+        spawn_blocking(move || {
+            let read_txn = db.begin_read()?;
+            Self::get_role_by_uuid_blocking(&read_txn, uuid_key)
+        })
+        .await?
     }
 
     fn get_role_by_uuid_blocking(
-        db: Arc<Database>,
+        read_txn: &ReadTransaction,
         uuid_key: UuidKey,
     ) -> Result<Option<Role>, InternalError> {
-        let read_txn = db.begin_read()?;
         let name_role = read_txn.open_table(UUID_ROLE)?;
         name_role
             .get(uuid_key)
@@ -199,10 +229,11 @@ impl Backend {
         let db = self.db.clone();
         let roles = roles.clone();
         spawn_blocking(move || {
+            let read_txn = db.begin_read()?;
             let role_opts: Vec<Option<Role>> = roles
                 .iter()
-                .map(|uuid| UuidKey(uuid.clone()))
-                .map(|uuid_key| Backend::get_role_by_uuid_blocking(db.clone(), uuid_key))
+                .map(|uuid| UuidKey(*uuid))
+                .map(|uuid_key| Self::get_role_by_uuid_blocking(&read_txn, uuid_key))
                 .collect::<Result<Vec<Option<Role>>, InternalError>>()?;
 
             let permissions = role_opts
@@ -219,10 +250,10 @@ impl Backend {
 // We use a type alias for convenience.
 //
 // Note that we've supplied our concrete backend here.
-pub type AuthSession = axum_login::AuthSession<Backend>;
+pub type AuthSession = axum_login::AuthSession<AuthBackend>;
 
 #[async_trait]
-impl AuthnBackend for Backend {
+impl AuthnBackend for AuthBackend {
     type User = Player;
     type Credentials = (String, String);
     type Error = InternalError;
@@ -245,7 +276,7 @@ impl AuthnBackend for Backend {
 }
 
 #[async_trait]
-impl AuthzBackend for Backend {
+impl AuthzBackend for AuthBackend {
     type Permission = Permission;
 
     async fn get_user_permissions(
@@ -276,8 +307,8 @@ impl AuthzBackend for Backend {
 
 #[cfg(test)]
 mod test {
-    use super::Backend;
-    use crate::web::auth::types::{Permission, Player, Role};
+    use super::AuthBackend;
+    use crate::auth::types::{Permission, Player, Role};
     use password_auth::generate_hash;
     use redb::Database;
     use std::collections::HashSet;
@@ -292,7 +323,7 @@ mod test {
 
     #[tokio::test]
     async fn test_insert_get_player() {
-        let backend = Backend::new(temp_db());
+        let backend = AuthBackend::new(temp_db()).expect("new backend");
 
         let input_password = "password";
         let password_hash = generate_hash(input_password);
@@ -337,16 +368,16 @@ mod test {
         players.sort_by(|p1, p2| p1.name.cmp(&p2.name));
         let mut inserted_players = vec![inserted_player1, inserted_player2];
         inserted_players.sort_by(|p1, p2| p1.name.cmp(&p2.name));
-        assert_eq!(inserted_players, players);
+        assert_eq!(inserted_players, players[1..]);
     }
 
     #[tokio::test]
     async fn test_insert_get_role() {
-        let backend = Backend::new(temp_db());
+        let backend = AuthBackend::new(temp_db()).expect("new backend");
         let inserted_role1 = Role {
             uuid: Uuid::new_v4(),
             name: "test1".to_string(),
-            permissions: [Permission::AssignAdm, Permission::ChangeTargetBlock].into(),
+            permissions: [Permission::AssignAdm, Permission::ChangeTarget].into(),
         };
         let existing_role1 = backend
             .insert_role(&inserted_role1)
@@ -362,7 +393,7 @@ mod test {
         let inserted_role2 = Role {
             uuid: Uuid::new_v4(),
             name: "test2".to_string(),
-            permissions: [Permission::ChangeTargetBlock].into(),
+            permissions: [Permission::ChangeTarget].into(),
         };
         let existing_role2 = backend
             .insert_role(&inserted_role2)
@@ -374,15 +405,16 @@ mod test {
         roles.sort_by(|p1, p2| p1.name.cmp(&p2.name));
         let mut inserted_roles = vec![inserted_role1.clone(), inserted_role2.clone()];
         inserted_roles.sort_by(|p1, p2| p1.name.cmp(&p2.name));
-        assert_eq!(inserted_roles, roles);
+        assert_eq!(inserted_roles, roles[1..]);
 
         let inserted_role_uuids = HashSet::from_iter([inserted_role1.uuid, inserted_role2.uuid]);
         let permissions = backend
             .get_roles_permissions(&inserted_role_uuids)
             .await
             .expect("get roles permissions");
-        let inserted_permissions =
-            HashSet::from_iter([Permission::AssignAdm, Permission::ChangeTargetBlock]);
-        assert_eq!(inserted_permissions, permissions);
+        let mut permissions = permissions.into_iter().collect::<Vec<Permission>>();
+        permissions.sort();
+        let inserted_permissions = [Permission::AssignAdm, Permission::ChangeTarget];
+        assert_eq!(inserted_permissions, permissions[..]);
     }
 }

@@ -1,25 +1,22 @@
-use super::auth::{types::Permission, Backend};
+use crate::app::AppState;
+use crate::auth::{backend::AuthBackend, types::Permission};
 use axum::{routing::post, Router};
 use axum_login::permission_required;
-use redb::Database;
 use std::sync::Arc;
 
-pub fn router() -> Router<Arc<Database>> {
+pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/target", post(self::post::target))
-        .route_layer(permission_required!(Backend, Permission::ChangeTargetBlock))
+        .route_layer(permission_required!(AuthBackend, Permission::ChangeTarget))
 }
 
 mod post {
+    use crate::app::AppState;
+    use crate::auth::backend::AuthSession;
     use axum::http::StatusCode;
     use axum::{extract::State, response::IntoResponse, Form};
-    use axum_login::AuthzBackend;
-    use log::info;
-    use redb::Database;
     use serde::Deserialize;
     use std::sync::Arc;
-
-    use crate::{error::Error, web::auth::AuthSession};
 
     #[derive(Deserialize)]
     pub struct TargetForm {
@@ -28,9 +25,9 @@ mod post {
 
     pub async fn target(
         auth_session: AuthSession,
-        State(db): State<Arc<Database>>,
+        State(app_state): State<Arc<AppState>>,
         Form(target_form): Form<TargetForm>,
-    ) -> Result<impl IntoResponse, Error> {
+    ) -> Result<impl IntoResponse, ()> {
         let new_block = target_form.block;
         dbg!(&new_block);
         // match auth_session.user {
