@@ -87,7 +87,8 @@ impl App {
 
         let guess_backend = GuessBackend::new(self.db.clone()).map(|gb| Arc::new(gb))?;
         // task to update block hash when confirmed
-        let update_task = tokio::task::spawn(continuously_update_target_nonce(guess_backend.clone()));
+        let update_task =
+            tokio::task::spawn(continuously_update_target_nonce(guess_backend.clone()));
 
         let app_state = Arc::new(AppState { guess_backend });
 

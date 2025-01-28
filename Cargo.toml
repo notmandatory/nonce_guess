@@ -8,7 +8,7 @@ resolver = "2"
 
 [dependencies]
 anyhow = "1"
-askama = { version = "0.12", default-features = false, features = ["with-axum"] }
+askama = { version = "0.12", features = ["with-axum"] }
 askama_axum = "0.4.0"
 async-trait = "0.1.85"
 axum = { version = "0.7", features = ["http2", "macros"] }

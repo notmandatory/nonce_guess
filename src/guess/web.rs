@@ -22,7 +22,9 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/target", post(target))
         .route_layer(permission_required!(AuthBackend, Permission::ChangeTarget))
         .route("/", get(home))
+        .route("/target", get(home_target))
         .route("/", post(guess))
+        .route("/guesses", get(home_guesses))
         .route_layer(login_required!(AuthBackend, login_url = "/login"))
 }
 
@@ -32,6 +34,20 @@ pub fn router() -> Router<Arc<AppState>> {
 pub struct HomeTemplate {
     target: Option<(u32, Option<u32>)>,
     change_target: bool,
+    guesses: Vec<GuessTableData>,
+    add_guess: bool,
+}
+
+#[derive(Template)]
+#[template(path = "home_target.html")]
+pub struct TargetTemplate {
+    target: Option<(u32, Option<u32>)>,
+    change_target: bool,
+}
+
+#[derive(Template)]
+#[template(path = "home_guesses.html")]
+pub struct GuessesTemplate {
     guesses: Vec<GuessTableData>,
     add_guess: bool,
 }
@@ -103,6 +119,28 @@ pub async fn home(
         change_target,
         guesses,
         add_guess,
+    })
+}
+
+pub async fn home_target(
+    auth_session: AuthSession,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<TargetTemplate, GuessError> {
+    let home_template = home(auth_session, State(app_state)).await?;
+    Ok(TargetTemplate {
+        target: home_template.target,
+        change_target: home_template.change_target,
+    })
+}
+
+pub async fn home_guesses(
+    auth_session: AuthSession,
+    State(app_state): State<Arc<AppState>>,
+) -> Result<GuessesTemplate, GuessError> {
+    let home_template = home(auth_session, State(app_state)).await?;
+    Ok(GuessesTemplate {
+        guesses: home_template.guesses,
+        add_guess: home_template.add_guess,
     })
 }
 

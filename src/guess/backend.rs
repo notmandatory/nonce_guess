@@ -262,7 +262,9 @@ impl GuessBackend {
     }
 }
 
-pub async fn continuously_update_target_nonce(guess_backend: Arc<GuessBackend>) -> Result<(), InternalError> {
+pub async fn continuously_update_target_nonce(
+    guess_backend: Arc<GuessBackend>,
+) -> Result<(), InternalError> {
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
     interval.tick().await; // The first tick completes immediately; skip.
     loop {

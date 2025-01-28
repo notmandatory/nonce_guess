@@ -49,11 +49,14 @@ impl LoginTemplate {
 }
 
 #[axum::debug_handler]
-async fn login_page(Query(NextUrl { next }): Query<NextUrl>) -> LoginTemplate {
-    LoginTemplate {
+async fn login_page(Query(NextUrl { next }): Query<NextUrl>) -> Response {
+    let page = LoginTemplate {
         next,
         register_form: false,
-    }
+    };
+    let mut response = page.into_response();
+    response.headers_mut().insert("HX-Refresh", HeaderValue::try_from("true").expect("value"));
+    response
 }
 
 #[axum::debug_handler]
