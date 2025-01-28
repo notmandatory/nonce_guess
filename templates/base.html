@@ -6,7 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- TODO <meta http-equiv="Content-Security-Policy" content="default-src 'self'> -->
     <link href="/assets/main.css" rel="stylesheet" />
-    <link href="https://rsms.me/inter/inter.css" rel="stylesheet" />
     <link
       rel="apple-touch-icon"
       sizes="180x180"
@@ -26,17 +25,7 @@
     />
     <link rel="manifest" href="/assets/site.webmanifest" />
     <title>{% block title %}{{ title }}{% endblock %}</title>
-    <script
-      src="https://unpkg.com/htmx.org@1.9.6"
-      integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni"
-      crossorigin="anonymous"
-    ></script>
-    <script src="https://unpkg.com/htmx.org/dist/ext/response-targets.js"></script>
-    <script
-      src="https://cdn.jsdelivr.net/npm/js-base64@3.7.4/base64.min.js"
-      integrity="sha384-VkKbwLiG7C18stSGuvcw9W0BHk45Ba7P9LJG5c01Yo4BI6qhFoWSa9TQLNA6EOzI"
-      crossorigin="anonymous"
-    ></script>
+    <script src="/assets/htmx.min.js"></script>
     {% block head %}{% endblock %}
   </head>
   <body>
