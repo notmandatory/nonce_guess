@@ -1,8 +1,7 @@
 use crate::app::AppState;
 use crate::auth::backend::{AuthBackend, AuthSession};
-use crate::auth::types::{Permission, RegisterError};
+use crate::auth::types::Permission;
 use crate::guess::types::{Guess, GuessError, TargetError};
-use crate::types::InternalError;
 use askama_axum::IntoResponse;
 use askama_axum::Template;
 use axum::extract::State;
@@ -10,11 +9,11 @@ use axum::http::{HeaderValue, StatusCode};
 use axum::routing::{get, post};
 use axum::{Form, Router};
 use axum_login::{login_required, permission_required};
-use regex::{Regex, RegexSet};
-use serde::{Deserialize, Serialize};
+use regex::Regex;
+use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::info;
 use uuid::Uuid;
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -42,7 +41,6 @@ pub struct HomeTemplate {
 #[template(path = "home_target.html")]
 pub struct TargetTemplate {
     target: Option<(u32, Option<u32>)>,
-    change_target: bool,
 }
 
 #[derive(Template)]
@@ -94,7 +92,7 @@ pub async fn home(
         sort_guesses_by_target_diff(&mut guesses, nonce);
     } else {
         // sort by player name
-        &mut guesses.sort_by(|a, b| a.name.cmp(&b.name));
+        guesses.sort_by(|a, b| a.name.cmp(&b.name));
     }
 
     let mut add_guess = false;
@@ -129,7 +127,6 @@ pub async fn home_target(
     let home_template = home(auth_session, State(app_state)).await?;
     Ok(TargetTemplate {
         target: home_template.target,
-        change_target: home_template.change_target,
     })
 }
 
@@ -200,7 +197,6 @@ pub struct TargetForm {
 }
 
 pub async fn target(
-    auth_session: AuthSession,
     State(app_state): State<Arc<AppState>>,
     Form(target_form): Form<TargetForm>,
 ) -> Result<impl IntoResponse, TargetError> {

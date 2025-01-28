@@ -1,6 +1,4 @@
 use crate::app::App;
-use axum::response::IntoResponse;
-use clap::Parser;
 use std::path::PathBuf;
 use tracing::debug;
 use tracing_subscriber::layer::SubscriberExt;
@@ -10,22 +8,8 @@ use tracing_subscriber::EnvFilter;
 pub mod app;
 pub mod auth;
 pub mod guess;
-mod protected;
-mod restricted;
 mod session_store;
 mod types;
-
-/// Nonce Guess Server CLI arguments
-#[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
-struct CliArgs {
-    /// Address this server should listen on, defaults to "localhost:8081"
-    #[arg(short, long, value_name = "HOST:PORT")]
-    listen_address: Option<String>,
-    #[arg(short, long, value_name = "DB_URL", env = "NONCE_GUESS_DB_URL")]
-    /// SQLite DB URL for this server, ie. "sqlite://nonce_guess.sqlite?mode=rwc", defaults to in-memory DB
-    database_url: Option<String>,
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,16 +20,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     "axum_login=debug,tower_sessions=debug,sqlx=warn,tower_http=debug,{}=debug",
                     env!("CARGO_CRATE_NAME")
                 )
-                .into()
             },
         )))
         .with(tracing_subscriber::fmt::layer())
         .try_init()?;
 
-    // get database URL from env
-    let database_file = std::env::var("NONCE_GUESS_DB_FILE")
-        .ok()
-        .map(|path| PathBuf::from(path));
+    // get database file name from env
+    let database_file = std::env::var("NONCE_GUESS_DB_FILE").ok().map(PathBuf::from);
     debug!("database_file: {:?}", &database_file);
 
     // get effective public domainname from env

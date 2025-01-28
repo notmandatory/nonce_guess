@@ -55,7 +55,9 @@ async fn login_page(Query(NextUrl { next }): Query<NextUrl>) -> Response {
         register_form: false,
     };
     let mut response = page.into_response();
-    response.headers_mut().insert("HX-Refresh", HeaderValue::try_from("true").expect("value"));
+    response
+        .headers_mut()
+        .insert("HX-Refresh", HeaderValue::try_from("true").expect("value"));
     response
 }
 

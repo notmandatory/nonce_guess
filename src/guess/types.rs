@@ -1,5 +1,3 @@
-use crate::auth::backend::AuthBackend;
-use crate::auth::types::RegisterError;
 use crate::types::InternalError;
 use askama_axum::{IntoResponse, Response};
 use axum::http::StatusCode;
@@ -81,13 +79,13 @@ impl IntoResponse for GuessError {
                 )
                     .into_response()
             }
-            GuessError::InvalidNonce(nonce) => (
+            GuessError::InvalidNonce(_) => (
                 StatusCode::OK,
                 [("HX-Retarget", "#flash_message")],
                 "Invalid nonce.",
             )
                 .into_response(),
-            GuessError::DuplicateNonce(nonce) => (
+            GuessError::DuplicateNonce(_) => (
                 StatusCode::OK,
                 [("HX-Retarget", "#flash_message")],
                 "Guess made by another player.",

@@ -48,8 +48,8 @@ impl App {
 
     pub async fn serve(
         self,
-        domain_name: String,
-        web_url: String,
+        _domain_name: String,
+        _web_url: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // static assets
         let serve_assets = ServeEmbed::<Assets>::new();
@@ -85,7 +85,7 @@ impl App {
         let auth_backend = AuthBackend::new(self.db.clone())?;
         let auth_layer = AuthManagerLayerBuilder::new(auth_backend, session_layer).build();
 
-        let guess_backend = GuessBackend::new(self.db.clone()).map(|gb| Arc::new(gb))?;
+        let guess_backend = GuessBackend::new(self.db.clone()).map(Arc::new)?;
         // task to update block hash when confirmed
         let update_task =
             tokio::task::spawn(continuously_update_target_nonce(guess_backend.clone()));

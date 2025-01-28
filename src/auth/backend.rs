@@ -3,7 +3,6 @@ use crate::types::{InternalError, UuidKey};
 use async_trait::async_trait;
 use axum_login::{AuthnBackend, AuthzBackend, UserId};
 use password_auth::{generate_hash, verify_password};
-use redb::TableError::TableDoesNotExist;
 use redb::{
     self, Database, ReadTransaction, ReadableTable, ReadableTableMetadata, TableDefinition,
     WriteTransaction,
@@ -34,9 +33,9 @@ impl AuthBackend {
         let db = db.clone();
         let mut write_txn = db.begin_write()?;
         let tables_empty = {
-            let mut uuid_role = write_txn.open_table(UUID_ROLE)?;
-            let mut uuid_player = write_txn.open_table(UUID_PLAYER)?;
-            let mut name_uuid = write_txn.open_table(NAME_UUID)?;
+            let uuid_role = write_txn.open_table(UUID_ROLE)?;
+            let uuid_player = write_txn.open_table(UUID_PLAYER)?;
+            let name_uuid = write_txn.open_table(NAME_UUID)?;
             info!(
                 "opened tables: {}, {}, {}",
                 UUID_ROLE, UUID_PLAYER, NAME_UUID

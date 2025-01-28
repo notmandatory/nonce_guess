@@ -13,11 +13,17 @@ Required Tools:
 
 Build and Run:
 
-1. Start the server, it will also serve the latest web client
+1. Set env variables, defaults are
+   ```shell
+   # if `NONCE_GUESS_DB_FILE` not set the data is stored in temporary file.
+   export NONCE_GUESS_DB_FILE=/data/nonce_guess.redb
+   export NONCE_GUESS_DOMAIN_NAME=localhost
+   export NONCE_GUESS_WEB_URL=http://localhost:8081
+   ```
+2. Start the server, it will also serve the latest web client
    ```shell
    RUST_LOG=debug cargo run
-
-By default, the data is stored in SQLite memory database. For authentication the URL must use `localhost` and not `127.0.0.1`, e.g. `http://localhost:3000`.
+   ```
 
 ### Create Release Build
 
@@ -26,9 +32,9 @@ By default, the data is stored in SQLite memory database. For authentication the
    cargo build --release
    ```
 
-To run the resulting self contained binary use `RUST_LOG=debug target/release/ng_server`.
+To run the resulting self-contained binary use `RUST_LOG=debug target/release/ng_server`.
 
-In test or release mode the web client can be found at: http://localhost:3000/
+In test or release mode the web client can be found at: http://localhost:8081/
 
 ### Build Docker Container
 

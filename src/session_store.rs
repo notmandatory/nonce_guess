@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use log::warn;
-use redb::{Database, Key, ReadableTable, TableDefinition, TypeName, Value};
+use redb::{Database, Key, TableDefinition, TypeName, Value};
 use std::cmp::Ordering;
 use std::sync::Arc;
 use tokio::task::spawn_blocking;
@@ -59,10 +59,7 @@ impl RedbSessionStore {
         Ok::<(), Error>(())
     }
 
-    pub fn load_blocking(
-        db: Arc<Database>,
-        id_key: IdKey,
-    ) -> session_store::Result<Option<Record>> {
+    fn load_blocking(db: Arc<Database>, id_key: IdKey) -> session_store::Result<Option<Record>> {
         let read_txn = db.begin_read().map_err(|e| Error::Backend(e.to_string()))?;
         let id_record = read_txn
             .open_table(ID_RECORD)
@@ -81,7 +78,7 @@ impl SessionStore for RedbSessionStore {
         let db = self.db.clone();
         let mut record = record.clone();
         spawn_blocking(move || {
-            let mut id_key = IdKey(record.id.clone());
+            let mut id_key = IdKey(record.id);
             while Self::load_blocking(db.clone(), id_key)
                 .unwrap_or(None)
                 .is_some()
@@ -89,7 +86,7 @@ impl SessionStore for RedbSessionStore {
                 // Session ID collision mitigation.
                 warn!("session record id collision: {}", &record.id.0);
                 record.id = Id::default();
-                id_key = IdKey(record.id.clone());
+                id_key = IdKey(record.id);
             }
             Self::save_blocking(db.clone(), record)
         })

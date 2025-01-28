@@ -1,11 +1,10 @@
 use crate::guess::types::{Block, Guess, GuessError};
 use crate::types::InternalError;
 use redb::{
-    Database, MultimapTableDefinition, MultimapValue, ReadTransaction, ReadableTable,
-    TableDefinition, WriteTransaction,
+    Database, MultimapTableDefinition, ReadTransaction, ReadableTable, TableDefinition,
+    WriteTransaction,
 };
 use std::sync::Arc;
-use tokio::io::AsyncReadExt;
 use tokio::task::spawn_blocking;
 use tracing::info;
 use uuid::Uuid;
@@ -27,7 +26,7 @@ impl GuessBackend {
 
     pub fn init(db: &Arc<Database>) -> Result<Self, InternalError> {
         let db = db.clone();
-        let mut write_txn = db.begin_write()?;
+        let write_txn = db.begin_write()?;
         // open tables to make sure they exist
         write_txn.open_table(HEIGHT_NONCE)?;
         write_txn.open_multimap_table(HEIGHT_GUESSES)?;
@@ -59,7 +58,7 @@ impl GuessBackend {
         let mut height_nonce = write_txn.open_table(HEIGHT_NONCE)?;
         height_nonce
             .insert(height, nonce)
-            .map(|opt| opt.map(|ag| ag.value()).flatten())
+            .map(|opt| opt.and_then(|ag| ag.value()))
             .map_err(Into::into)
     }
 
@@ -80,7 +79,7 @@ impl GuessBackend {
         read_txn: &ReadTransaction,
         height: u32,
     ) -> Result<Option<Option<u32>>, InternalError> {
-        let mut height_nonce = read_txn
+        let height_nonce = read_txn
             .open_table(HEIGHT_NONCE)
             .map_err(Into::<InternalError>::into)?;
         height_nonce
@@ -93,7 +92,7 @@ impl GuessBackend {
         let db = self.db.clone();
         spawn_blocking(move || {
             let read_txn = db.begin_read()?;
-            let mut height_nonce = read_txn.open_table(HEIGHT_NONCE)?;
+            let height_nonce = read_txn.open_table(HEIGHT_NONCE)?;
             height_nonce
                 .last()
                 .map(|opt| opt.map(|(k_ag, v_ag)| (k_ag.value(), v_ag.value())))
@@ -120,7 +119,7 @@ impl GuessBackend {
         let mut height_nonce = write_txn.open_table(HEIGHT_NONCE)?;
         height_nonce
             .remove(height)
-            .map(|opt| opt.map(|ag| ag.value()).flatten())
+            .map(|opt| opt.and_then(|ag| ag.value()))
             .map_err(Into::into)
     }
 
@@ -131,7 +130,7 @@ impl GuessBackend {
     ) -> Result<(), InternalError> {
         let db = self.db.clone();
         spawn_blocking(move || {
-            let mut write_txn = db.begin_write().map_err(Into::<InternalError>::into)?;
+            let write_txn = db.begin_write().map_err(Into::<InternalError>::into)?;
             {
                 let mut height_nonce = write_txn
                     .open_table(HEIGHT_NONCE)
@@ -154,21 +153,20 @@ impl GuessBackend {
                     .remove_all(old_height)
                     .map(|guess| {
                         guess
-                            .map(|ag_res| {
+                            .flat_map(|ag_res| {
                                 ag_res
                                     .map(|ag| ag.value())
                                     .map_err(Into::<InternalError>::into)
                             })
-                            .flatten()
                             .collect::<Vec<Guess>>()
                     })
                     .map_err(Into::<InternalError>::into)?;
                 // insert guesses from old target into new target
-                let _ = guesses.iter().try_for_each(|guess| {
+                guesses.iter().try_for_each(|guess| {
                     let present_res = height_guesses
                         .insert(new_height, guess)
                         .map_err(Into::<InternalError>::into);
-                    present_res.map(|r| ())
+                    present_res.map(|_| ())
                 })?;
             }
             write_txn.commit().map_err(Into::<InternalError>::into)
@@ -180,7 +178,7 @@ impl GuessBackend {
     pub async fn insert_guess(&self, height: u32, guess: Guess) -> Result<bool, InternalError> {
         let db = self.db.clone();
         spawn_blocking(move || {
-            let mut write_txn = db.begin_write()?;
+            let write_txn = db.begin_write()?;
             let insert_target_result = {
                 let mut height_guesses = write_txn.open_multimap_table(HEIGHT_GUESSES)?;
                 height_guesses.insert(height, &guess).map_err(Into::into)
@@ -215,17 +213,15 @@ impl GuessBackend {
         let height_guesses = read_txn
             .open_multimap_table(HEIGHT_GUESSES)
             .map_err(Into::<InternalError>::into)?;
-        let guesses = height_guesses
+        let mut guesses = height_guesses
             .get(height)
             .map_err(Into::<InternalError>::into)?;
 
-        guesses.fold(Ok(false), |res, guess_res| {
-            res.map(|any| {
-                guess_res
-                    .map(|ag| any || ag.value().player == player_uuid)
-                    .map_err(Into::<InternalError>::into)
-                    .map_err(Into::<GuessError>::into)
-            })?
+        guesses.try_fold(false, |any, guess_res| {
+            guess_res
+                .map(|ag| any || ag.value().player == player_uuid)
+                .map_err(Into::<InternalError>::into)
+                .map_err(Into::<GuessError>::into)
         })
     }
 
@@ -250,12 +246,11 @@ impl GuessBackend {
             .get(height)
             .map(|guess| {
                 guess
-                    .map(|ag_res| {
+                    .flat_map(|ag_res| {
                         ag_res
                             .map(|ag| ag.value())
                             .map_err(Into::<InternalError>::into)
                     })
-                    .flatten()
                     .collect::<Vec<Guess>>()
             })
             .map_err(Into::<InternalError>::into)
