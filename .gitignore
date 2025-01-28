@@ -1,4 +1,3 @@
 target/
-/assets/main.css
 *.redb
 node_modules

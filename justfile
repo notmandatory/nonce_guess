@@ -3,10 +3,10 @@ d:
 r:
     cargo build --release
 tb:
-    tailwindcss -c tailwind.config.js -i styles/tailwind.css -o assets/main.css
+    npx @tailwindcss/cli -c tailwind.config.js -i styles/tailwind.css -o assets/main.css
 
 tw:
-    tailwindcss -c tailwind.config.js -i styles/tailwind.css -o assets/main.css --watch
+    npx @tailwindcss/cli -c tailwind.config.js -i styles/tailwind.css -o assets/main.css --watch
 
 db:
     docker build -t nonce_guess .
