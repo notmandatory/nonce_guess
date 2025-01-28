@@ -5,7 +5,7 @@ COPY . .
 
 RUN apt update && apt upgrade -y
 RUN apt install curl
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.14/tailwindcss-linux-x64 && mv tailwindcss-linux-x64 tailwindcss && chmod +x tailwindcss
+RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.0.0/tailwindcss-linux-x64 && mv tailwindcss-linux-x64 tailwindcss && chmod +x tailwindcss
 ENV PATH=$PATH:.
 RUN cargo build --release
 
