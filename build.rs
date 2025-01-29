@@ -7,8 +7,6 @@ fn main() {
 
     let mut cmd = Command::new("tailwindcss");
     cmd.args([
-        "-c",
-        "tailwind.config.js",
         "-i",
         "styles/tailwind.css",
         "-o",

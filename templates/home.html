@@ -5,10 +5,10 @@
 >
   <article>
     <h2
-      class="max-w-md text-center text-4xl font-bold text-slate-900 dark:text-white"
+      class="max-w-md text-center text-4xl font-bold text-slate-900"
     >
       Guess the
-      <span class="text-indigo-700 dark:text-indigo-300">Block Nonce </span>
+      <span class="text-indigo-700">Block Nonce </span>
       Win a Prize!
     </h2>
   </article>
@@ -29,13 +29,13 @@
     <form id="group" novalidate hx-post="/target">
       <div class="mb-1 mt-6">
         <label
-          class="text-l text-left font-bold text-slate-900 dark:text-white"
+          class="text-l text-left font-bold text-slate-900"
           for="height"
           >Target Block Height</label
         >
         <input
           id="height"
-          class="peer mt-2 block w-60 rounded-md p-3 text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+          class="peer mt-2 block w-60 rounded-md ring-1 p-1.5 text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
           name="height"
           type="text"
           autocomplete="off"
@@ -51,7 +51,7 @@
       </div>
       <div class="mt-6 flex items-center justify-center gap-x-6">
         <button
-          class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 group-invalid:pointer-events-none group-invalid:opacity-30"
+          class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-xs hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 group-invalid:pointer-events-none group-invalid:opacity-30"
           type="submit"
         >
           Change
@@ -67,13 +67,13 @@
     <form id="group2" novalidate hx-post="/">
       <div class="mb-1 mt-6">
         <label
-          class="text-l text-left font-bold text-slate-900 dark:text-white"
+          class="text-l text-left font-bold text-slate-900"
           for="guess"
           >Nonce Guess</label
         >
         <input
           id="guess"
-          class="peer mt-2 block w-60 rounded-md p-3 text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+          class="peer mt-2 block w-60 rounded-md p-1.5 ring-1 text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
           name="guess"
           type="text"
           required
@@ -91,7 +91,7 @@
       </div>
       <div class="mt-6 flex items-center justify-center gap-x-6">
         <button
-          class="group2-invalid:pointer-events-none group2-invalid:opacity-30 flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          class="group2-invalid:pointer-events-none group2-invalid:opacity-30 flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-xs hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           type="submit"
         >
           Submit
@@ -108,7 +108,7 @@
   </section>
   <div class="mt-6 flex items-center justify-center gap-x-6">
     <button
-      class="group2-invalid:pointer-events-none group2-invalid:opacity-30 flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+      class="group2-invalid:pointer-events-none group2-invalid:opacity-30 flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-xs hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
       hx-get="/logout"
     >
       Logout

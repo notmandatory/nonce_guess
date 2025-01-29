@@ -2,7 +2,7 @@
   "name": "nonce_guess",
   "version": "1.0.0",
   "description": "",
-  "main": "tailwind.config.js",
+  "main": "tailwind.config.js.old",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
