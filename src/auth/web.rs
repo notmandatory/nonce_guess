@@ -4,7 +4,6 @@ use crate::app::AppState;
 use askama_axum::IntoResponse;
 use askama_axum::Template;
 use axum::extract::Query;
-use axum::http::uri::PathAndQuery;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::Response;
 use axum::routing::{get, post};
@@ -30,30 +29,11 @@ pub fn router() -> Router<Arc<AppState>> {
 #[template(path = "login.html")]
 struct LoginTemplate {
     next: Option<String>,
-    register_form: bool,
-}
-
-impl LoginTemplate {
-    fn push_url(&self, target: &str) -> String {
-        let path: PathAndQuery = if let Some(next) = &self.next {
-            format!("/{}?next={}", target, next)
-                .parse()
-                .expect("Failed to parse path and query")
-        } else {
-            format!("/{}", target)
-                .parse()
-                .expect("Failed to parse path")
-        };
-        path.to_string()
-    }
 }
 
 #[axum::debug_handler]
 async fn login_page(Query(NextUrl { next }): Query<NextUrl>) -> Response {
-    let page = LoginTemplate {
-        next,
-        register_form: false,
-    };
+    let page = LoginTemplate { next };
     let mut response = page.into_response();
     response
         .headers_mut()
@@ -61,12 +41,13 @@ async fn login_page(Query(NextUrl { next }): Query<NextUrl>) -> Response {
     response
 }
 
+#[derive(Template)]
+#[template(path = "register.html")]
+struct RegisterTemplate {}
+
 #[axum::debug_handler]
-async fn register_page(Query(NextUrl { next }): Query<NextUrl>) -> LoginTemplate {
-    LoginTemplate {
-        next,
-        register_form: true,
-    }
+async fn register_page() -> RegisterTemplate {
+    RegisterTemplate {}
 }
 
 #[derive(Deserialize)]

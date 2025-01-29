@@ -7,12 +7,18 @@
 
 ### Local Testing
 
-Required Tools:
+Tools:
 
-1. Install [tailwindcss](https://github.com/tailwindlabs/tailwindcss)
-```shell
-npm install tailwindcss @tailwindcss/cli
-```
+1. Install [tailwindcss](https://github.com/tailwindlabs/tailwindcss) [standalone-cli](https://tailwindcss.com/blog/standalone-cli) and make sure it's in your executables path, for example:
+   ```shell
+   curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.0.0/tailwindcss-macos-arm64
+   chmod +x tailwindcss-macos-arm64
+   mv tailwindcss-macos-arm64 ~/bin/tailwindcss
+   ```
+2. Prettier plugin for tailwindcss (optional):
+   ```shell
+   npm install -D prettier prettier-plugin-tailwindcss
+   ```
 
 Build and Run:
 
@@ -20,12 +26,9 @@ Build and Run:
    ```shell
    # if `NONCE_GUESS_DB_FILE` not set the data is stored in temporary file.
    export NONCE_GUESS_DB_FILE=/data/nonce_guess.redb
-   export NONCE_GUESS_DOMAIN_NAME=localhost
-   export NONCE_GUESS_WEB_URL=http://localhost:8081
    ```
 2. Start the server, it will also serve the latest web client
    ```shell
-   npx tailwindcss -c tailwind.config.js -i styles/tailwind.css -o assets/main.css --watch
    RUST_LOG=debug cargo run
    ```
 
@@ -33,7 +36,6 @@ Build and Run:
 
 1. Build the server binary, this will include the web artifacts
    ```shell
-   npx tailwindcss -c tailwind.config.js -i styles/tailwind.css -o assets/main.css
    cargo build --release
    ```
 
@@ -43,9 +45,8 @@ In test or release mode the web client can be found at: http://localhost:8081/
 
 ### Build Docker Container
 
-1. `npx tailwindcss -c tailwind.config.js -i styles/tailwind.css -o assets/main.css`
-2. `docker build -t nonce_guess .`
-3. `docker run -d --rm -it -p 8081:8081 -v nonce_vol:/data --name nonce_guess_app nonce_guess`
-4. Visit http://localhost:8081/ in a browser
+1. `docker build -t nonce_guess .`
+2. `docker run -d --rm -it -p 8081:8081 -v nonce_vol:/data --name nonce_guess_app nonce_guess`
+3. Visit http://localhost:8081/ in a browser
 
 Note: on linux above steps also work with `podman` instead of `docker`.

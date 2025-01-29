@@ -29,17 +29,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_file = std::env::var("NONCE_GUESS_DB_FILE").ok().map(PathBuf::from);
     debug!("database_file: {:?}", &database_file);
 
-    // get effective public domainname from env
-    let domain_name = std::env::var("NONCE_GUESS_DOMAIN_NAME").unwrap_or("localhost".to_string());
-    debug!("domain_name: {:?}", &domain_name);
-
-    // get effective public web service URL from env
-    let web_url =
-        std::env::var("NONCE_GUESS_WEB_URL").unwrap_or("http://localhost:8081".to_string());
-    debug!("web_url: {:?}", &web_url);
-
     App::new(database_file)
         .await?
-        .serve(domain_name, web_url)
+        .serve()
         .await
 }

@@ -48,8 +48,6 @@ impl App {
 
     pub async fn serve(
         self,
-        _domain_name: String,
-        _web_url: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // static assets
         let serve_assets = ServeEmbed::<Assets>::new();

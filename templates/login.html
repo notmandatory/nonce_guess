@@ -18,7 +18,6 @@
     alt="Nonce Guess Logo"
   />
 </section>
-{% if !register_form -%}
 <section
   id="login_form"
   class="flex scroll-mt-10 flex-col items-center justify-center gap-4 p-6"
@@ -31,7 +30,7 @@
       >Name</label>
       <input
         id="username"
-        class="peer mt-2 block w-60 rounded-md py-1.5 text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+        class="peer mt-2 block p-3 w-60 rounded-md text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
         name="username"
         type="text"
         autocomplete="username"
@@ -40,7 +39,7 @@
         pattern="[0-9a-zA-Z_]{3,20}"
       />
       <div
-        class="hidden w-60 gap-6 py-1.5 font-semibold leading-6 text-red-600 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
+        class="hidden w-60 gap-6 p-1.5 font-semibold leading-6 text-red-600 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
       >
         <p id="name_error_message">
           Must be 3-20 characters and only include upper or lowercase A-Z, 0-9, and underscore.
@@ -55,7 +54,7 @@
       >
       <input
         id="password"
-        class="peer mt-2 block w-60 rounded-md py-1.5 text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+        class="peer mt-2 block w-60 p-3 rounded-md text-gray-900 shadow-sm ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 dark:bg-gray-900 dark:text-white dark:ring-black invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
         name="password"
         type="password"
         autocomplete="off"
@@ -63,7 +62,7 @@
         placeholder=" "
         pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_])[A-Za-z\d@$!%*?&#^_]{8,20}"
       />
-      <button id="show" name="show" type="button" hx-on:click="togglePassword('show','password')">
+      <button id="show" name="show" tabindex="-1" type="button" hx-on:click="togglePassword('show','password')">
         Show
       </button>
       <div
@@ -101,9 +100,6 @@
     No account? click register.
   </p>
 </section>
-{% else -%}
-{% include "register_form.html" %}
-{% endif -%}
 <script>
   function togglePassword(button_name, password_name) {
     let show = document.querySelector("button[name=" + button_name + "]");

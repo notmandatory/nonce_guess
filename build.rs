@@ -1,9 +1,9 @@
 use std::process::Command;
 
 fn main() {
-    println!("cargo:rerun-if-changed=assets");
-    // only "src/web/template" is supposed to contain maud templates that would affect tailwind
-    println!("cargo:rerun-if-changed=src/web/template");
+    println!("cargo:rerun-if-changed=./assets");
+    // only "./template" is supposed to contain Askama templates that would affect tailwind
+    println!("cargo:rerun-if-changed=./templates");
 
     let mut cmd = Command::new("tailwindcss");
     cmd.args([
