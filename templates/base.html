@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
+    {% block head %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link href="/assets/main.css" rel="stylesheet">
@@ -24,8 +25,10 @@
     />
     <link rel="manifest" href="/assets/site.webmanifest" />
     <title>{% block title %}{{ title }}{% endblock %}</title>
+    {% block scripts %}
     <script src="/assets/htmx.min.js"></script>
-    {% block head %}{% endblock %}
+    {% endblock %}
+    {% endblock %}
   </head>
   <body>
     <div id="content">
@@ -34,4 +37,8 @@
       {% endblock %}
     </div>
   </body>
+  <footer>
+    {% block footer %}
+    {% endblock %}
+  </footer>
 </html>

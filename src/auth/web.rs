@@ -69,19 +69,19 @@ impl LoginForm {
 
 #[derive(Deserialize)]
 pub struct RegisterForm {
-    username: String,
-    password: String,
-    password_confirm: String,
+    new_username: String,
+    new_password: String,
+    confirm_password: String,
     next: Option<String>,
 }
 
 impl RegisterForm {
     pub fn password_hash(&self) -> String {
-        generate_hash(&self.password)
+        generate_hash(&self.new_password)
     }
 
     pub fn credentials(&self) -> (String, String) {
-        (self.username.clone(), self.password.clone())
+        (self.new_username.clone(), self.new_password.clone())
     }
 }
 
@@ -116,19 +116,19 @@ async fn register_password(
     mut auth_session: AuthSession,
     Form(register_form): Form<RegisterForm>,
 ) -> Result<impl IntoResponse, RegisterError> {
-    let name = register_form.username.clone();
-    let password = register_form.password.clone();
-    let password_confirm = register_form.password_confirm.clone();
+    let new_username = register_form.new_username.clone();
+    let new_password = register_form.new_password.clone();
+    let confirm_password = register_form.confirm_password.clone();
     // validate credentials
-    validate_name_password(&name, &password)?;
-    if password != password_confirm {
+    validate_name_password(&new_username, &new_password)?;
+    if new_password != confirm_password {
         Err(RegisterError::UnconfirmedPassword)
     } else {
         let uuid = Uuid::new_v4();
         let password_hash = register_form.password_hash();
         let player = Player {
             uuid,
-            name,
+            name: new_username,
             password_hash,
             ..Default::default()
         };
@@ -152,25 +152,25 @@ async fn register_password(
             Ok(response)
         } else {
             // failed authentication
-            Err(RegisterError::Authentication(register_form.username))
+            Err(RegisterError::Authentication(register_form.new_username))
         }
     }
 }
 
-fn validate_name_password(name: &str, password: &str) -> Result<(), RegisterError> {
+fn validate_name_password(new_username: &str, new_password: &str) -> Result<(), RegisterError> {
     let name_re = Regex::new(r#"[0-9a-zA-Z_]{3,20}"#).unwrap();
     let password_re = RegexSet::new([
         r#".*[a-z]"#,
         r#".*[A-Z]"#,
         r#".*\d"#,
-        r#".*[@$!%*?&#^_]"#,
-        r#"[A-Za-z\d@$!%*?&#^_]{8,20}"#,
+        r#".*[@$!%*?&#^_\.\-]"#,
+        r#"[A-Za-z\d@$!%*?&#^_\.\-]{8,20}"#,
     ])
     .unwrap();
 
-    if !name_re.is_match(name) {
+    if !name_re.is_match(new_username) {
         Err(RegisterError::InvalidName)
-    } else if !password_re.matches(password).matched_all() {
+    } else if !password_re.matches(new_password).matched_all() {
         Err(RegisterError::InvalidPassword)
     } else {
         Ok(())

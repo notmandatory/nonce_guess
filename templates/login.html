@@ -1,5 +1,22 @@
-{% extends "base.html" %} {% block title %}Login{% endblock %} {% block content
-%}
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block scripts %}
+{% call super() %}
+<script>
+  function togglePassword(button_name, password_name) {
+    let show = document.querySelector("button[name=" + button_name + "]");
+    let password = document.querySelector("input[name=" + password_name + "]");
+    if (password.getAttribute("type") === "password") {
+      password.setAttribute("type", "text");
+      show.innerHTML = "Hide";
+    } else {
+      password.setAttribute("type", "password");
+      show.innerHTML = "Show";
+    }
+  }
+</script>
+{% endblock %}
+{% block content %}
 <section
   id="login"
   class="mb-6 flex scroll-mt-10 flex-col-reverse items-center justify-center gap-8 p-6">
@@ -18,6 +35,7 @@
     alt="Nonce Guess Logo"
   />
 </section>
+{% block form %}
 <section
   id="login_form"
   class="flex scroll-mt-10 flex-col items-center justify-center gap-4 p-6"
@@ -57,10 +75,10 @@
         class="peer mt-2 block w-60 ring-1 p-1.5 rounded-md text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
         name="password"
         type="password"
-        autocomplete="off"
+        autocomplete="current-password"
         required
         placeholder=" "
-        pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_])[A-Za-z\d@$!%*?&#^_]{8,20}"
+        pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_\.\-])[A-Za-z\d@$!%*?&#^_\.\-]{8,20}"
       />
       <button id="show" name="show" tabindex="-1" type="button" hx-on:click="togglePassword('show','password')">
         Show
@@ -70,8 +88,7 @@
       >
         <p id="password_error_message">
           Must be 8-20 characters and include at least one uppercase, one
-          lowercase, one number, and one special character [ @ $ ! % * ? & # ^ _
-          ].
+          lowercase, one number, and one special character [ @ $ ! % * ? & # ^ _ . - ].
         </p>
       </div>
       {% if let Some(next) = next %}
@@ -100,17 +117,5 @@
     No account? click register.
   </p>
 </section>
-<script>
-  function togglePassword(button_name, password_name) {
-    let show = document.querySelector("button[name=" + button_name + "]");
-    let password = document.querySelector("input[name=" + password_name + "]");
-    if (password.getAttribute("type") === "password") {
-      password.setAttribute("type", "text");
-      show.innerHTML = "Hide";
-    } else {
-      password.setAttribute("type", "password");
-      show.innerHTML = "Show";
-    }
-  }
-</script>
+{% endblock %}
 {% endblock %}

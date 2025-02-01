@@ -1,23 +1,6 @@
-{% extends "base.html" %} {% block title %}Register{% endblock %} {% block content
-%}
-<section
-  id="login"
-  class="mb-6 flex scroll-mt-10 flex-col-reverse items-center justify-center gap-8 p-6">
-  <article>
-    <h2
-      class="max-w-md text-center text-4xl font-bold text-slate-900"
-    >
-      Guess the
-      <span class="text-indigo-700">Block Nonce </span>
-      Win a Prize!
-    </h2>
-  </article>
-  <img
-    class="h-20 w-auto"
-    src="../assets/apple-touch-icon.png"
-    alt="Nonce Guess Logo"
-  />
-</section>
+{% extends "login.html" %}
+{% block title %}Register{% endblock %}
+{% block form %}
 <section
   id="register_form"
   class="flex scroll-mt-10 flex-col items-center justify-center gap-4 p-6"
@@ -26,14 +9,14 @@
     <div class="mb-1 mt-6">
       <label
         class="text-l text-left font-bold text-slate-900"
-        for="username"
+        for="new_username"
       >Name</label>
       <input
-        id="username"
+        id="new_username"
         class="peer mt-2 block w-60 rounded-md p-1.5 ring-1 text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
-        name="username"
+        name="new_username"
         type="text"
-        autocomplete="username"
+        autocomplete="new-username"
         required
         placeholder=" "
         pattern="[0-9a-zA-Z_]{3,20}"
@@ -49,20 +32,20 @@
     <div class="relative mb-1 mt-6">
       <label
         class="text-l text-left font-bold text-slate-900"
-        for="password"
+        for="new_password"
       >Password</label
       >
       <input
-        id="password"
+        id="new_password"
         class="peer mt-2 block w-60 rounded-md ring-1 p-1.5 text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
-        name="password"
+        name="new_password"
         type="password"
-        autocomplete="off"
+        autocomplete="new-password"
         required
         placeholder=" "
-        pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_])[A-Za-z\d@$!%*?&#^_]{8,20}"
+        pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_\.\-])[A-Za-z\d@$!%*?&#^_\.\-]{8,20}"
       />
-      <button id="show" name="show" tabindex="-1" type="button" hx-on:click="togglePassword('show','password')">
+      <button id="show" name="show" tabindex="-1" type="button" hx-on:click="togglePassword('show','new_password')">
         Show
       </button>
       <div
@@ -70,28 +53,27 @@
       >
         <p id="password_error_message">
           Must be 8-20 characters and include at least one uppercase, one
-          lowercase, one number, and one special character [ @ $ ! % * ? & # ^ _
-          ].
+          lowercase, one number, and one special character [ @ $ ! % * ? & # ^ _ . - ].
         </p>
       </div>
       <div class="mb-1 mt-6">
         <label
           class="mt-6 text-l text-left font-bold text-slate-900"
-          for="password_confirm"
+          for="confirm_password"
         >Confirm Password</label
         >
         <input
-          id="password_confirm"
+          id="confirm_password"
           class="peer mt-2 block w-60 rounded-md p-1.5 ring-1 text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
-          name="password_confirm"
+          name="confirm_password"
           type="password"
-          autocomplete="off"
+          autocomplete="new-password"
           required
           placeholder=" "
-          pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_])[A-Za-z\d@$!%*?&#^_]{8,20}"
+          pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_\.\-])[A-Za-z\d@$!%*?&#^_\.\-]{8,20}"
         />
         <button id="show_confirm" name="show_confirm" tabindex="-1" type="button"
-                hx-on:click="togglePassword('show_confirm','password_confirm')">
+                hx-on:click="togglePassword('show_confirm','confirm_password')">
           Show
         </button>
       </div>
@@ -115,17 +97,4 @@
     <p id="flash_message"></p>
   </div>
 </section>
-<script>
-  function togglePassword(button_name, password_name) {
-    let show = document.querySelector("button[name=" + button_name + "]");
-    let password = document.querySelector("input[name=" + password_name + "]");
-    if (password.getAttribute("type") === "password") {
-      password.setAttribute("type", "text");
-      show.innerHTML = "Hide";
-    } else {
-      password.setAttribute("type", "password");
-      show.innerHTML = "Show";
-    }
-  }
-</script>
-{% endblock %}
+{% endblock form %}
