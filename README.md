@@ -26,6 +26,7 @@ Build and Run:
    ```shell
    # if `NONCE_GUESS_DB_FILE` not set the data is stored in temporary file.
    export NONCE_GUESS_DB_FILE=/data/nonce_guess.redb
+   export NONCE_GUESS_MEMPOOL_URL=/data/nonce_guess.redb
    ```
 2. Start the server, it will also serve the latest web client
    ```shell

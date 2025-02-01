@@ -4,6 +4,7 @@ use redb::{
     Database, MultimapTableDefinition, ReadTransaction, ReadableTable, TableDefinition,
     WriteTransaction,
 };
+use reqwest::Url;
 use std::sync::Arc;
 use tokio::task::spawn_blocking;
 use tracing::info;
@@ -16,15 +17,25 @@ const HEIGHT_GUESSES: MultimapTableDefinition<u32, Guess> =
 #[derive(Debug, Clone)]
 pub struct GuessBackend {
     pub db: Arc<Database>,
+    pub http_client: reqwest::Client,
+    pub mempool_url: Url,
 }
 
 impl GuessBackend {
-    pub fn new(db: Arc<Database>) -> Result<Self, InternalError> {
-        Self::init(&db)?;
-        Ok(Self { db })
+    pub fn new(
+        db: Arc<Database>,
+        http_client: reqwest::Client,
+        mempool_url: Url,
+    ) -> Result<Self, InternalError> {
+        Self::init_db(&db)?;
+        Ok(Self {
+            db,
+            http_client,
+            mempool_url,
+        })
     }
 
-    pub fn init(db: &Arc<Database>) -> Result<Self, InternalError> {
+    pub fn init_db(db: &Arc<Database>) -> Result<(), InternalError> {
         let db = db.clone();
         let write_txn = db.begin_write()?;
         // open tables to make sure they exist
@@ -32,7 +43,7 @@ impl GuessBackend {
         write_txn.open_multimap_table(HEIGHT_GUESSES)?;
         info!("opened tables: {}, {}", HEIGHT_NONCE, HEIGHT_GUESSES);
         write_txn.commit()?;
-        Ok(Self { db })
+        Ok(())
     }
 
     pub async fn insert_target(
@@ -272,18 +283,21 @@ pub async fn continuously_update_target_nonce(
 
 async fn update_target_nonce(guess_backend: Arc<GuessBackend>) -> Result<(), InternalError> {
     if let Some((height, None)) = guess_backend.get_last_target_nonce().await? {
-        let client = reqwest::Client::builder()
-            .use_native_tls()
-            .danger_accept_invalid_certs(true)
-            .build()?;
+        let client = guess_backend.http_client.clone();
         let block_height_response = client
-            .get(format!("https://mempool.space/api/block-height/{}", height))
+            .get(format!(
+                "{}/api/block-height/{}",
+                guess_backend.mempool_url, height
+            ))
             .send()
             .await?;
         if block_height_response.status().is_success() {
             let block_hash = block_height_response.text().await?;
             let block_response = client
-                .get(format!("https://mempool.space/api/block/{}", block_hash))
+                .get(format!(
+                    "{}/api/block/{}",
+                    guess_backend.mempool_url, block_hash
+                ))
                 .send()
                 .await?;
             if block_response.status().is_success() {

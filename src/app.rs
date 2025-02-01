@@ -9,6 +9,7 @@ use axum_login::{
     AuthManagerLayerBuilder,
 };
 use redb::Database;
+use reqwest::Url;
 use rust_embed::RustEmbed;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -24,6 +25,8 @@ struct Assets;
 
 pub struct App {
     db: Arc<Database>,
+    http_client: reqwest::Client,
+    mempool_url: Url,
 }
 
 pub struct AppState {
@@ -31,7 +34,10 @@ pub struct AppState {
 }
 
 impl App {
-    pub async fn new(database_file: Option<PathBuf>) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(
+        database_file: Option<PathBuf>,
+        mempool_url: Option<Url>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         // setup database file
         let db = if let Some(file) = database_file {
             Database::create(file)?
@@ -40,15 +46,22 @@ impl App {
             let file = NamedTempFile::new()?.into_temp_path();
             Database::create(file)?
         };
+        let http_client = reqwest::Client::builder()
+            .use_native_tls()
+            .danger_accept_invalid_certs(true)
+            .build()?;
+        let mempool_url = mempool_url.unwrap_or(Url::parse("https://mempool.space")?);
 
         // TODO: call database migrations here
 
-        Ok(Self { db: Arc::new(db) })
+        Ok(Self {
+            db: Arc::new(db),
+            http_client,
+            mempool_url,
+        })
     }
 
-    pub async fn serve(
-        self,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn serve(self) -> Result<(), Box<dyn std::error::Error>> {
         // static assets
         let serve_assets = ServeEmbed::<Assets>::new();
 
@@ -69,7 +82,6 @@ impl App {
         let key = Key::generate();
 
         let session_layer = SessionManagerLayer::new(session_store)
-            //.with_name("webauthnrs")
             .with_same_site(SameSite::Strict)
             // TODO: change this to true when running on an HTTPS/production server instead of locally
             .with_secure(false)
@@ -83,7 +95,13 @@ impl App {
         let auth_backend = AuthBackend::new(self.db.clone())?;
         let auth_layer = AuthManagerLayerBuilder::new(auth_backend, session_layer).build();
 
-        let guess_backend = GuessBackend::new(self.db.clone()).map(Arc::new)?;
+        let guess_backend = GuessBackend::new(
+            self.db.clone(),
+            self.http_client.clone(),
+            self.mempool_url.clone(),
+        )
+        .map(Arc::new)?;
+
         // task to update block hash when confirmed
         let update_task =
             tokio::task::spawn(continuously_update_target_nonce(guess_backend.clone()));

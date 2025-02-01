@@ -152,7 +152,6 @@ pub async fn guess(
     Form(guess_form): Form<GuessForm>,
 ) -> Result<impl IntoResponse, GuessError> {
     let guess = guess_form.guess.clone();
-    dbg!(&guess);
     if let Some((height, nonce_opt)) = app_state
         .guess_backend
         .get_last_target_nonce()

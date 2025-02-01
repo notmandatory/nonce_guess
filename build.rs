@@ -6,12 +6,7 @@ fn main() {
     println!("cargo:rerun-if-changed=./templates");
 
     let mut cmd = Command::new("tailwindcss");
-    cmd.args([
-        "-i",
-        "styles/tailwind.css",
-        "-o",
-        "assets/main.css",
-    ]);
+    cmd.args(["-i", "styles/tailwind.css", "-o", "assets/main.css"]);
     if cfg!(not(debug_assertions)) {
         cmd.arg("--minify");
     }
