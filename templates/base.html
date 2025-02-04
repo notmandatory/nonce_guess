@@ -2,10 +2,10 @@
 <html lang="en">
   <head>
     {% block head %}
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="/assets/main.css" rel="stylesheet">
-    <link href="/assets/inter.css" rel="stylesheet">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="/assets/main.css" rel="stylesheet" />
+    <link href="/assets/inter.css" rel="stylesheet" />
     <link
       rel="apple-touch-icon"
       sizes="180x180"
@@ -27,8 +27,7 @@
     <title>{% block title %}{{ title }}{% endblock %}</title>
     {% block scripts %}
     <script src="/assets/htmx.min.js"></script>
-    {% endblock %}
-    {% endblock %}
+    {% endblock %} {% endblock %}
   </head>
   <body>
     <div id="content">
@@ -37,8 +36,5 @@
       {% endblock %}
     </div>
   </body>
-  <footer>
-    {% block footer %}
-    {% endblock %}
-  </footer>
+  <footer>{% block footer %} {% endblock %}</footer>
 </html>

@@ -11,19 +11,20 @@ use axum::{Form, Router};
 use axum_login::{login_required, permission_required};
 use regex::Regex;
 use serde::Deserialize;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::info;
 use uuid::Uuid;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
-        .route("/target", post(target))
+        .route("/target", post(target_form))
         .route_layer(permission_required!(AuthBackend, Permission::ChangeTarget))
-        .route("/", get(home))
-        .route("/target", get(home_target))
-        .route("/", post(guess))
-        .route("/guesses", get(home_guesses))
+        .route("/", get(home_page))
+        .route("/target", get(target_page))
+        .route("/target/table", get(target_table))
+        .route("/", post(guess_form))
+        .route("/guess/table", get(guess_table))
         .route_layer(login_required!(AuthBackend, login_url = "/login"))
 }
 
@@ -32,20 +33,26 @@ pub fn router() -> Router<Arc<AppState>> {
 #[template(path = "home.html")]
 pub struct HomeTemplate {
     target: Option<(u32, Option<u32>)>,
-    change_target: bool,
     guesses: Vec<GuessTableData>,
     add_guess: bool,
 }
 
 #[derive(Template)]
-#[template(path = "home_target.html")]
+#[template(path = "target.html")]
 pub struct TargetTemplate {
+    target: Option<(u32, Option<u32>)>,
+    change_target: bool,
+}
+
+#[derive(Template)]
+#[template(path = "target_table.html")]
+pub struct TargetTable {
     target: Option<(u32, Option<u32>)>,
 }
 
 #[derive(Template)]
-#[template(path = "home_guesses.html")]
-pub struct GuessesTemplate {
+#[template(path = "guess_table.html")]
+pub struct GuessTable {
     guesses: Vec<GuessTableData>,
     add_guess: bool,
 }
@@ -56,7 +63,7 @@ pub struct GuessTableData {
     pub decimal: u32,
 }
 
-pub async fn home(
+pub async fn home_page(
     auth_session: AuthSession,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<HomeTemplate, GuessError> {
@@ -96,12 +103,7 @@ pub async fn home(
     }
 
     let mut add_guess = false;
-    let mut all_permissions = HashSet::new();
-
     if let Some(player) = auth_session.user {
-        let permissions = auth_session.backend.get_player_permissions(&player).await?;
-        all_permissions.extend(permissions);
-
         if let Some((height, None)) = target {
             add_guess = !app_state
                 .guess_backend
@@ -110,32 +112,46 @@ pub async fn home(
         }
     }
 
-    //let target = target.map(|(height, nonce)| (height, nonce.map(|nonce| format!("{:x}", nonce))));
-    let change_target = all_permissions.contains(&Permission::ChangeTarget);
     Ok(HomeTemplate {
         target,
-        change_target,
         guesses,
         add_guess,
     })
 }
 
-pub async fn home_target(
+pub async fn target_page(
     auth_session: AuthSession,
     State(app_state): State<Arc<AppState>>,
 ) -> Result<TargetTemplate, GuessError> {
-    let home_template = home(auth_session, State(app_state)).await?;
+    let target = app_state.guess_backend.get_last_target_nonce().await?;
+
+    let mut change_target = false;
+    if let Some(player) = auth_session.user {
+        let permissions = auth_session.backend.get_player_permissions(&player).await?;
+        change_target = permissions.contains(&Permission::ChangeTarget)
+    }
+
     Ok(TargetTemplate {
-        target: home_template.target,
+        target,
+        change_target,
     })
 }
 
-pub async fn home_guesses(
+pub async fn target_table(
+    State(app_state): State<Arc<AppState>>,
+) -> Result<TargetTable, GuessError> {
+    let target = app_state.guess_backend.get_last_target_nonce().await?;
+    Ok(TargetTable {
+        target,
+    })
+}
+
+pub async fn guess_table(
     auth_session: AuthSession,
     State(app_state): State<Arc<AppState>>,
-) -> Result<GuessesTemplate, GuessError> {
-    let home_template = home(auth_session, State(app_state)).await?;
-    Ok(GuessesTemplate {
+) -> Result<GuessTable, GuessError> {
+    let home_template = home_page(auth_session, State(app_state)).await?;
+    Ok(GuessTable {
         guesses: home_template.guesses,
         add_guess: home_template.add_guess,
     })
@@ -146,7 +162,7 @@ pub struct GuessForm {
     guess: String,
 }
 
-pub async fn guess(
+pub async fn guess_form(
     auth_session: AuthSession,
     State(app_state): State<Arc<AppState>>,
     Form(guess_form): Form<GuessForm>,
@@ -171,10 +187,10 @@ pub async fn guess(
         }
     }
     let mut response = StatusCode::OK.into_response();
-    response.headers_mut().insert(
-        "HX-Location",
-        HeaderValue::try_from("/").expect("home value"),
-    );
+    // response.headers_mut().insert(
+    //     "HX-Location",
+    //     HeaderValue::try_from("/").expect("home value"),
+    // );
     Ok(response)
 }
 
@@ -195,7 +211,7 @@ pub struct TargetForm {
     height: u32,
 }
 
-pub async fn target(
+pub async fn target_form(
     State(app_state): State<Arc<AppState>>,
     Form(target_form): Form<TargetForm>,
 ) -> Result<impl IntoResponse, TargetError> {
@@ -244,10 +260,10 @@ pub async fn target(
         }
     }
     let mut response = StatusCode::OK.into_response();
-    response.headers_mut().insert(
-        "HX-Location",
-        HeaderValue::try_from("/").expect("home value"),
-    );
+    // response.headers_mut().insert(
+    //     "HX-Location",
+    //     HeaderValue::try_from("/").expect("home value"),
+    // );
     Ok(response)
 }
 

@@ -1,5 +1,4 @@
 {
   "plugins": ["prettier-plugin-tailwindcss"],
-  "tailwindStylesheet": "./styles/tailwind.css",
-  "tailwindConfig": "./tailwind.config.js"
+  "tailwindStylesheet": "./styles/tailwind.css"
 }

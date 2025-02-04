@@ -21,7 +21,7 @@ mime_guess = { version = "2" }
 password-auth = {  version = "1.0.0" }
 redb = "2.4"
 reqwest = { version = "0.12", features = ["json","native-tls"] }
-rust-embed = { version = "8.4.0" }
+rust-embed = { version = "8.4.0", features = ["axum-ex"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1.0"
 serde_with = "3.8.1"

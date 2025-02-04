@@ -1,4 +1,4 @@
-{% extends "base.html" %} {% block title %}Login{% endblock %} {% block
+{% extends "base.html" %} {% block title %}Target{% endblock %} {% block
 content%} {% include "nav.html" %}
 <section
   class="mb-6 flex scroll-mt-10 flex-col items-center justify-center gap-8 p-6"
@@ -6,37 +6,35 @@ content%} {% include "nav.html" %}
   <section id="target" hx-get="/target/table" hx-trigger="every 5s">
     {% include "target_table.html" %}
   </section>
-  {% if add_guess %}
-  <div id="guess_form">
-    <form id="group2" novalidate hx-post="/">
+  {% if change_target %}
+  <div id="target_form">
+    <form id="group" novalidate hx-post="/target">
       <div class="mt-6 mb-1">
-        <label class="text-l text-left font-bold text-slate-900" for="guess"
-          >Nonce Guess</label
+        <label class="text-l text-left font-bold text-slate-900" for="height"
+          >Target Block Height</label
         >
         <input
-          id="guess"
+          id="height"
           class="peer mt-2 block w-60 rounded-md p-1.5 text-gray-900 ring-1 shadow-xs ring-gray-300 ring-inset placeholder:text-gray-400 focus:ring-2 focus:ring-indigo-600 focus:ring-inset sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
-          name="guess"
+          name="height"
           type="text"
+          autocomplete="off"
           required
           placeholder=" "
-          autocomplete="off"
-          pattern="[0-9a-fA-F]{8}"
+          pattern="[0-9]{6,7}"
         />
         <div
           class="hidden w-60 gap-6 py-1.5 leading-6 font-semibold text-red-600 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
         >
-          <p id="guess_error_message">
-            Must be 8 characters and only include a-f, A-F, and 0-9.
-          </p>
+          <p id="target_error_message">Must be valid block height.</p>
         </div>
       </div>
       <div class="mt-6 flex items-center justify-center gap-x-6">
         <button
-          class="group2-invalid:pointer-events-none group2-invalid:opacity-30 flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm leading-6 font-semibold text-gray-100 shadow-xs hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+          class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm leading-6 font-semibold text-gray-100 shadow-xs group-invalid:pointer-events-none group-invalid:opacity-30 hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
           type="submit"
         >
-          Submit
+          Change
         </button>
       </div>
     </form>
@@ -45,8 +43,5 @@ content%} {% include "nav.html" %}
     </div>
   </div>
   {% endif %}
-  <section id="guesses" hx-get="/guess/table" hx-trigger="every 5s">
-    {% include "guess_table.html" %}
-  </section>
 </section>
 {% endblock %}
