@@ -1,9 +1,7 @@
 {% if let Some((height, nonce)) = target %}
 <div class="flex items-center">
   <div class="sm:flex-auto">
-    <h2 class="text-grey-900 text-lg leading-6 font-semibold">
-      {% if nonce.is_some() %} Prior Target {% else %} Next Target {% endif %}
-    </h2>
+    <h2 class="text-grey-900 text-lg leading-6 font-semibold">Target</h2>
   </div>
 </div>
 <div class="flex items-center">

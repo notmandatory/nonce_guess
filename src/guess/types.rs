@@ -1,6 +1,6 @@
 use crate::types::InternalError;
-use askama_axum::{IntoResponse, Response};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use redb::{Key, TypeName, Value};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;

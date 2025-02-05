@@ -1,6 +1,6 @@
 use super::backend::AuthBackend;
-use askama_axum::{IntoResponse, Response};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum_login::AuthUser;
 use redb::{TypeName, Value};
 use serde::{Deserialize, Serialize};

@@ -1,16 +1,16 @@
 use super::backend::AuthSession;
 use super::types::{LoginError, Player, RegisterError};
 use crate::app::AppState;
-use askama_axum::IntoResponse;
-use askama_axum::Template;
+use crate::types::InternalError;
 use axum::extract::Query;
 use axum::http::{HeaderValue, StatusCode};
-use axum::response::Response;
+use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Form, Router};
 use axum_login::Error::Backend;
 use password_auth::generate_hash;
 use regex::{Regex, RegexSet};
+use rinja::Template;
 use serde::Deserialize;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -32,13 +32,15 @@ struct LoginTemplate {
 }
 
 #[axum::debug_handler]
-async fn login_page(Query(NextUrl { next }): Query<NextUrl>) -> Response {
+async fn login_page(
+    Query(NextUrl { next }): Query<NextUrl>,
+) -> Result<impl IntoResponse, InternalError> {
     let page = LoginTemplate { next };
-    let mut response = page.into_response();
+    let mut response = Html(page.render()?).into_response();
     response
         .headers_mut()
         .insert("HX-Refresh", HeaderValue::try_from("true").expect("value"));
-    response
+    Ok(response)
 }
 
 #[derive(Template)]
@@ -46,8 +48,8 @@ async fn login_page(Query(NextUrl { next }): Query<NextUrl>) -> Response {
 struct RegisterTemplate {}
 
 #[axum::debug_handler]
-async fn register_page() -> RegisterTemplate {
-    RegisterTemplate {}
+async fn register_page() -> Result<impl IntoResponse, InternalError> {
+    Ok(Html(RegisterTemplate {}.render()?))
 }
 
 #[derive(Deserialize)]

@@ -8,8 +8,6 @@ resolver = "2"
 
 [dependencies]
 anyhow = "1"
-askama = { version = "0.12", features = ["with-axum"] }
-askama_axum = "0.4.0"
 async-trait = "0.1.85"
 axum = { version = "0.7", features = ["http2", "macros"] }
 axum-embed = "0.1.0"
@@ -18,9 +16,9 @@ axum-login = { version = "0.16.0" }
 ciborium = { version = "0.2" }
 log = "0.4.20"
 mime_guess = { version = "2" }
-password-auth = {  version = "1.0.0" }
+password-auth = { version = "1.0.0" }
 redb = "2.4"
-reqwest = { version = "0.12", features = ["json","native-tls"] }
+reqwest = { version = "0.12", features = ["json", "native-tls"] }
 rust-embed = { version = "8.4.0", features = ["axum-ex"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1.0"
@@ -34,9 +32,10 @@ tokio = { version = "1.21", features = ["full"] }
 tower = { version = "0.4", features = ["full"] }
 tower-cookies = "0.10"
 tower-http = { version = "0.5", features = ["fs", "trace"] }
-tower-sessions = { version = "0.13.0", default-features = false, features = ["axum-core","signed"] }
+tower-sessions = { version = "0.13.0", default-features = false, features = ["axum-core", "signed"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = {  version = "1.6", features = ["v4", "v7", "serde"] }
+uuid = { version = "1.6", features = ["v4", "v7", "serde"] }
 bytes = "1.9.0"
 regex = "1.11.1"
+rinja = "0.3.5"

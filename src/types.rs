@@ -1,5 +1,5 @@
-use askama_axum::{IntoResponse, Response};
 use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use redb::{Key, TypeName, Value};
 use std::cmp::Ordering;
 use tracing::error;
@@ -49,6 +49,8 @@ impl Key for UuidKey {
 
 #[derive(thiserror::Error, Debug)]
 pub enum InternalError {
+    #[error(transparent)]
+    Rinja(#[from] rinja::Error),
     #[error("failed to generate new {0} uuid after {1} tries")]
     NewUuid(String, u8),
     #[error(transparent)]
