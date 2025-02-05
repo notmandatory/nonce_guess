@@ -1,11 +1,11 @@
+use super::types::{Guess, GuessError, TargetError};
 use crate::app::AppState;
 use crate::auth::backend::{AuthBackend, AuthSession};
 use crate::auth::types::Permission;
-use crate::guess::types::{Guess, GuessError, TargetError};
 use crate::types::InternalError;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse};
+use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Form, Router};
 use axum_login::{login_required, permission_required};
@@ -14,7 +14,7 @@ use rinja::Template;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{error, info};
 use uuid::Uuid;
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -329,4 +329,87 @@ pub fn sort_guesses_by_target_diff(guesses: &mut [GuessTableData], target_nonce:
         let target_b = target_nonce.abs_diff(b.decimal);
         target_a.cmp(&target_b)
     })
+}
+
+impl IntoResponse for GuessError {
+    fn into_response(self) -> Response {
+        match self {
+            GuessError::DuplicateGuess(height) => {
+                info!("player already made a guess for target height: {}", height);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    format!("You already made a guess for target height: {}", height),
+                )
+                    .into_response()
+            }
+            GuessError::InvalidNonce(_) => (
+                StatusCode::OK,
+                [("HX-Retarget", "#flash_message")],
+                "Invalid nonce.",
+            )
+                .into_response(),
+            GuessError::DuplicateNonce(_) => (
+                StatusCode::OK,
+                [("HX-Retarget", "#flash_message")],
+                "Guess made by another player.",
+            )
+                .into_response(),
+            GuessError::ConfirmedTarget(height) => {
+                info!("block was already confirmed for target height: {}", height);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Block already confirmed.",
+                )
+                    .into_response()
+            }
+            GuessError::MissingTarget(height) => {
+                info!("target does not exist for height: {}", height);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    format!("No target for height: {}", height),
+                )
+                    .into_response()
+            }
+            GuessError::Internal(e) => {
+                error!("{}", e);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Internal server error.",
+                )
+                    .into_response()
+            }
+        }
+    }
+}
+
+impl IntoResponse for TargetError {
+    fn into_response(self) -> Response {
+        match self {
+            TargetError::InvalidHeight(height) => {
+                info!(
+                    "new height less than or equal to current target height: {}",
+                    height
+                );
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "New height must be greater than current target height.",
+                )
+                    .into_response()
+            }
+            TargetError::Internal(e) => {
+                error!("{}", e);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Internal server error.",
+                )
+                    .into_response()
+            }
+        }
+    }
 }
