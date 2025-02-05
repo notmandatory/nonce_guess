@@ -329,7 +329,7 @@ mod test {
             .await
             .expect("created record2");
 
-        let mut loaded_record1 = session_store
+        let loaded_record1 = session_store
             .load(&record1.id)
             .await
             .expect("loaded record1");

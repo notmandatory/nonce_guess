@@ -1,11 +1,7 @@
 use super::backend::AuthBackend;
-use axum::http::StatusCode;
-use axum::response::{IntoResponse, Response};
-use axum_login::AuthUser;
-use redb::{TypeName, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use tracing::{error, info};
+use tracing::error;
 use uuid::Uuid;
 
 /// The players information
@@ -18,47 +14,6 @@ pub struct Player {
     pub password_hash: String,
     pub permissions: HashSet<Permission>,
     pub roles: HashSet<Uuid>,
-}
-
-impl AuthUser for Player {
-    type Id = Uuid;
-
-    fn id(&self) -> Self::Id {
-        self.uuid
-    }
-
-    fn session_auth_hash(&self) -> &[u8] {
-        self.password_hash.as_bytes()
-    }
-}
-
-impl Value for Player {
-    type SelfType<'a> = Player;
-    type AsBytes<'a> = Vec<u8>;
-
-    fn fixed_width() -> Option<usize> {
-        None
-    }
-
-    fn from_bytes<'a>(serialized_player: &'a [u8]) -> Self::SelfType<'a>
-    where
-        Self: 'a,
-    {
-        ciborium::from_reader(serialized_player).unwrap()
-    }
-
-    fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
-    where
-        Self: 'b,
-    {
-        let mut serialized_player = Vec::<u8>::new();
-        ciborium::into_writer(value, &mut serialized_player).expect("Failed to serialize player");
-        serialized_player
-    }
-
-    fn type_name() -> TypeName {
-        TypeName::new("nonce_guess::Player")
-    }
 }
 
 // Permissions that can be granted to a player.
@@ -96,35 +51,6 @@ pub struct Role {
     pub permissions: HashSet<Permission>,
 }
 
-impl Value for Role {
-    type SelfType<'a> = Role;
-    type AsBytes<'a> = Vec<u8>;
-
-    fn fixed_width() -> Option<usize> {
-        None
-    }
-
-    fn from_bytes<'a>(serialized_role: &'a [u8]) -> Self::SelfType<'a>
-    where
-        Self: 'a,
-    {
-        ciborium::from_reader(serialized_role).unwrap()
-    }
-
-    fn as_bytes<'a, 'b: 'a>(value: &'a Self::SelfType<'b>) -> Self::AsBytes<'a>
-    where
-        Self: 'b,
-    {
-        let mut serialized_role = Vec::<u8>::new();
-        ciborium::into_writer(value, &mut serialized_role).expect("Failed to serialize role");
-        serialized_role
-    }
-
-    fn type_name() -> TypeName {
-        TypeName::new("nonce_guess::Role")
-    }
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum RegisterError {
     #[error("invalid user name")]
@@ -141,95 +67,12 @@ pub enum RegisterError {
     Internal(#[from] axum_login::Error<AuthBackend>),
 }
 
-impl IntoResponse for RegisterError {
-    fn into_response(self) -> Response {
-        match self {
-            RegisterError::InvalidName => {
-                (
-                    StatusCode::OK,
-                    [("HX-Retarget", "#flash_message")],
-                    "Name must be 3-20 characters and only include upper or lowercase A-Z, 0-9, and underscore.",
-                )
-                    .into_response()
-            }
-            RegisterError::InvalidPassword => {
-                (
-                    StatusCode::OK,
-                    [("HX-Retarget", "#flash_message")],
-                    "Password must be 8-20 characters and include at least one uppercase, one lowercase, one number, and one special character [ @ $ ! % * ? & # ^ _ ].",
-                )
-                    .into_response()
-            }
-            RegisterError::UnconfirmedPassword => {
-                (
-                    StatusCode::OK,
-                    [("HX-Retarget", "#flash_message")],
-                    "Password and confirmation do not match.",
-                )
-                    .into_response()
-            }
-            RegisterError::UserAlreadyRegistered(user) => {
-                info!("user already registered: {}", user);
-                (
-                    StatusCode::OK,
-                    [("HX-Retarget", "#flash_message")],
-                    "Name is already registered.",
-                )
-                    .into_response()
-            }
-            RegisterError::Authentication(name) => {
-                info!("failed authentication for: {}", name);
-                (
-                    StatusCode::OK,
-                    [("HX-Retarget", "#flash_message")],
-                    "Failed authentication.",
-                )
-                    .into_response()
-            }
-            RegisterError::Internal(e) => {
-                error!("{}", e);
-                (
-                    StatusCode::OK,
-                    [("HX-Retarget", "#flash_message")],
-                    "Internal server error.",
-                )
-                    .into_response()
-            }
-        }
-    }
-}
-
 #[derive(thiserror::Error, Debug)]
 pub enum LoginError {
     #[error("failed authentication for name: {0}")]
     Authentication(String),
     #[error(transparent)]
     Internal(#[from] axum_login::Error<AuthBackend>),
-}
-
-impl IntoResponse for LoginError {
-    fn into_response(self) -> Response {
-        match self {
-            LoginError::Authentication(name) => {
-                info!("failed authentication for: {}", name);
-                (
-                    StatusCode::OK,
-                    [("HX-Retarget", "#flash_message")],
-                    format!("Failed authentication for: {}", name),
-                )
-                    .into_response()
-            }
-            LoginError::Internal(_) => {
-                error!("{}", self);
-                (
-                    StatusCode::OK,
-                    [("HX-Retarget", "#flash_message")],
-                    "Internal server error.",
-                )
-                    .into_response()
-            }
-        }
-    }
 }
 
 #[cfg(test)]

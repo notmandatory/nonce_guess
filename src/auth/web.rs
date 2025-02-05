@@ -13,6 +13,7 @@ use regex::{Regex, RegexSet};
 use rinja::Template;
 use serde::Deserialize;
 use std::sync::Arc;
+use tracing::{error, info};
 use uuid::Uuid;
 
 pub fn router() -> Router<Arc<AppState>> {
@@ -189,6 +190,89 @@ async fn logout(mut auth_session: AuthSession) -> impl IntoResponse {
             response
         }
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "failed to logout").into_response(),
+    }
+}
+
+impl IntoResponse for RegisterError {
+    fn into_response(self) -> Response {
+        match self {
+            RegisterError::InvalidName => {
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Name must be 3-20 characters and only include upper or lowercase A-Z, 0-9, and underscore.",
+                )
+                    .into_response()
+            }
+            RegisterError::InvalidPassword => {
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Password must be 8-20 characters and include at least one uppercase, one lowercase, one number, and one special character [ @ $ ! % * ? & # ^ _ ].",
+                )
+                    .into_response()
+            }
+            RegisterError::UnconfirmedPassword => {
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Password and confirmation do not match.",
+                )
+                    .into_response()
+            }
+            RegisterError::UserAlreadyRegistered(user) => {
+                info!("user already registered: {}", user);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Name is already registered.",
+                )
+                    .into_response()
+            }
+            RegisterError::Authentication(name) => {
+                info!("failed authentication for: {}", name);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Failed authentication.",
+                )
+                    .into_response()
+            }
+            RegisterError::Internal(e) => {
+                error!("{}", e);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Internal server error.",
+                )
+                    .into_response()
+            }
+        }
+    }
+}
+
+impl IntoResponse for LoginError {
+    fn into_response(self) -> Response {
+        match self {
+            LoginError::Authentication(name) => {
+                info!("failed authentication for: {}", name);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    format!("Failed authentication for: {}", name),
+                )
+                    .into_response()
+            }
+            LoginError::Internal(_) => {
+                error!("{}", self);
+                (
+                    StatusCode::OK,
+                    [("HX-Retarget", "#flash_message")],
+                    "Internal server error.",
+                )
+                    .into_response()
+            }
+        }
     }
 }
 
