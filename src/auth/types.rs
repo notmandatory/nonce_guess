@@ -3,10 +3,16 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tracing::error;
 use uuid::Uuid;
+use chrono::{DateTime, Utc};
+
+// A helper functions that return the current date time.
+fn datetime_now() -> DateTime<Utc> {
+    Utc::now()
+}
 
 /// The players information
 #[serde_with::skip_serializing_none]
-#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Player {
     pub uuid: Uuid,
@@ -14,6 +20,24 @@ pub struct Player {
     pub password_hash: String,
     pub permissions: HashSet<Permission>,
     pub roles: HashSet<Uuid>,
+    #[serde(default = "datetime_now")]
+    pub created_at: DateTime<Utc>,
+    #[serde(default = "datetime_now")]
+    pub updated_at: DateTime<Utc>,
+}
+
+impl Default for Player {
+    fn default() -> Self {
+        Self {
+            uuid: Default::default(),
+            name: "".to_string(),
+            password_hash: "".to_string(),
+            permissions: Default::default(),
+            roles: Default::default(),
+            created_at: datetime_now(),
+            updated_at: datetime_now(),
+        }
+    }
 }
 
 // Permissions that can be granted to a player.
@@ -98,6 +122,7 @@ mod test {
             password_hash,
             permissions,
             roles,
+            ..Default::default()
         };
         let encoded_player = Player::as_bytes(&orig_player);
         let decoded_player = Player::from_bytes(&encoded_player);

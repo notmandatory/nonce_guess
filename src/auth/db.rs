@@ -53,6 +53,7 @@ impl AuthDb {
                 password_hash,
                 permissions: Default::default(),
                 roles,
+                ..Default::default()
             };
             AuthDb::insert_role(write_txn, admin_role)?;
             AuthDb::insert_player(write_txn, admin)?;

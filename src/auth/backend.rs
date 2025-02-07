@@ -31,7 +31,7 @@ impl AuthBackend {
             write_txn.commit()?;
             insert_player_result
         })
-        .await?
+            .await?
     }
 
     pub async fn get_player_by_uuid(&self, uuid: &Uuid) -> Result<Option<Player>, InternalError> {
@@ -41,7 +41,7 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_player_by_uuid(&read_txn, uuid_key)
         })
-        .await?
+            .await?
     }
 
     pub async fn get_player_by_name(&self, name: &str) -> Result<Option<Player>, InternalError> {
@@ -59,7 +59,7 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_player_by_name(&read_txn, &name)
         })
-        .await?
+            .await?
     }
 
     pub async fn get_players(&self) -> Result<Vec<Player>, InternalError> {
@@ -68,7 +68,7 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_players(&read_txn)
         })
-        .await?
+            .await?
     }
 
     pub async fn get_player_permissions(
@@ -90,7 +90,7 @@ impl AuthBackend {
             write_txn.commit()?;
             insert_role_result
         })
-        .await?
+            .await?
     }
 
     pub async fn get_role_by_uuid(&self, uuid: &Uuid) -> Result<Option<Role>, InternalError> {
@@ -100,7 +100,7 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_role_by_uuid(&read_txn, uuid_key)
         })
-        .await?
+            .await?
     }
 
     pub async fn get_roles(&self) -> Result<Vec<Role>, InternalError> {
@@ -109,7 +109,7 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_roles(&read_txn)
         })
-        .await?
+            .await?
     }
 
     pub async fn get_roles_permissions(
@@ -133,7 +133,7 @@ impl AuthBackend {
                 .collect::<HashSet<Permission>>();
             Ok(permissions)
         })
-        .await?
+            .await?
     }
 }
 
@@ -236,6 +236,7 @@ mod test {
             password_hash: password_hash.clone(),
             permissions: [Permission::AssignAdm].into(),
             roles: Default::default(),
+            ..Default::default()
         };
         let existing_player1 = backend
             .insert_player(&inserted_player1)
@@ -259,6 +260,7 @@ mod test {
             password_hash,
             permissions: [Permission::AssignAdm].into(),
             roles: Default::default(),
+            ..Default::default()
         };
         let existing_player2 = backend
             .insert_player(&inserted_player2)

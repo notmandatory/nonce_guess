@@ -13,6 +13,7 @@ axum = { version = "0.7", features = ["http2", "macros"] }
 axum-embed = "0.1.0"
 axum-extra = { version = "0.9", features = [] }
 axum-login = { version = "0.16.0" }
+chrono = { version = "0.4.39", features = ["serde"] }
 ciborium = { version = "0.2" }
 log = "0.4.20"
 mime_guess = { version = "2" }
