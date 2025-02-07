@@ -1,5 +1,5 @@
 use super::db::AuthDb;
-use super::types::{Permission, Player, Role};
+use super::types::{datetime_now, Permission, Player, Role};
 use crate::types::{InternalError, UuidKey};
 use async_trait::async_trait;
 use axum_login::{AuthUser, AuthnBackend, AuthzBackend, UserId};
@@ -31,7 +31,25 @@ impl AuthBackend {
             write_txn.commit()?;
             insert_player_result
         })
-            .await?
+        .await?
+    }
+
+    pub async fn change_player(
+        &self,
+        orig_player: &Player,
+        new_player: &Player,
+    ) -> Result<Option<Player>, InternalError> {
+        let auth_db = self.auth_db.clone();
+        let orig_player = orig_player.clone();
+        let new_player = new_player.clone();
+        spawn_blocking(move || {
+            let mut write_txn = auth_db.begin_write()?;
+            let change_player_result =
+                AuthDb::change_player(&mut write_txn, orig_player, new_player);
+            write_txn.commit()?;
+            change_player_result
+        })
+        .await?
     }
 
     pub async fn get_player_by_uuid(&self, uuid: &Uuid) -> Result<Option<Player>, InternalError> {
@@ -41,25 +59,17 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_player_by_uuid(&read_txn, uuid_key)
         })
-            .await?
+        .await?
     }
 
     pub async fn get_player_by_name(&self, name: &str) -> Result<Option<Player>, InternalError> {
         let auth_db = self.auth_db.clone();
         let name = name.to_owned();
         spawn_blocking(move || {
-            // let read_txn = db.begin_read()?;
-            // let name_player_uuid = read_txn.open_table(NAME_UUID)?;
-            // let player = name_player_uuid
-            //     .get(&name)?
-            //     .map(|ag| ag.value().0)
-            //     .map(|uuid| Self::get_player_by_uuid_blocking(&read_txn, UuidKey(uuid)))
-            //     .transpose()
-            //     .map(|p| p.flatten())?;
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_player_by_name(&read_txn, &name)
         })
-            .await?
+        .await?
     }
 
     pub async fn get_players(&self) -> Result<Vec<Player>, InternalError> {
@@ -68,7 +78,7 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_players(&read_txn)
         })
-            .await?
+        .await?
     }
 
     pub async fn get_player_permissions(
@@ -90,7 +100,7 @@ impl AuthBackend {
             write_txn.commit()?;
             insert_role_result
         })
-            .await?
+        .await?
     }
 
     pub async fn get_role_by_uuid(&self, uuid: &Uuid) -> Result<Option<Role>, InternalError> {
@@ -100,7 +110,7 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_role_by_uuid(&read_txn, uuid_key)
         })
-            .await?
+        .await?
     }
 
     pub async fn get_roles(&self) -> Result<Vec<Role>, InternalError> {
@@ -109,7 +119,7 @@ impl AuthBackend {
             let read_txn = auth_db.begin_read()?;
             AuthDb::get_roles(&read_txn)
         })
-            .await?
+        .await?
     }
 
     pub async fn get_roles_permissions(
@@ -133,7 +143,7 @@ impl AuthBackend {
                 .collect::<HashSet<Permission>>();
             Ok(permissions)
         })
-            .await?
+        .await?
     }
 }
 
@@ -157,6 +167,14 @@ impl AuthnBackend for AuthBackend {
             .get_player_by_name(&name)
             .await?
             .filter(|player| verify_password(password, player.password_hash.as_str()).is_ok());
+        // update player last login
+        if let Some(orig_player) = uuid_player.clone() {
+            let updated_player = Player {
+                last_login: datetime_now(),
+                ..orig_player.clone()
+            };
+            self.change_player(&orig_player, &updated_player).await?;
+        }
         Ok(uuid_player)
     }
 

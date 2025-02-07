@@ -86,6 +86,29 @@ impl AuthDb {
             .map_err(Into::into)
     }
 
+    pub fn change_player(
+        write_txn: &mut WriteTransaction,
+        orig_player: Player,
+        new_player: Player,
+    ) -> Result<Option<Player>, InternalError> {
+        if orig_player != new_player {
+            if orig_player.name != new_player.name {
+                let name_uuid = &mut write_txn.open_table(NAME_UUID)?;
+                name_uuid.remove(&orig_player.name)?;
+                name_uuid
+                    .insert(&new_player.name, &UuidKey(orig_player.uuid))
+                    .map_err(Into::<InternalError>::into)?;
+            }
+            let uuid_player = &mut write_txn.open_table(UUID_PLAYER)?;
+            uuid_player
+                .insert(&UuidKey(orig_player.uuid), new_player.clone())
+                .map(|opt| opt.map(|ag| ag.value()))
+                .map_err(Into::into)
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn get_player_by_uuid(
         read_txn: &ReadTransaction,
         uuid_key: UuidKey,

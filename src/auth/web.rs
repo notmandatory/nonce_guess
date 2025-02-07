@@ -1,5 +1,5 @@
-use super::backend::AuthSession;
-use super::types::{LoginError, Player, RegisterError};
+use super::backend::{AuthBackend, AuthSession};
+use super::types::{datetime_now, LoginError, Player, RegisterError};
 use crate::app::AppState;
 use crate::types::InternalError;
 use axum::extract::Query;
@@ -7,6 +7,7 @@ use axum::http::{HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Form, Router};
+use axum_login::login_required;
 use axum_login::Error::Backend;
 use password_auth::generate_hash;
 use regex::{Regex, RegexSet};
@@ -18,11 +19,14 @@ use uuid::Uuid;
 
 pub fn router() -> Router<Arc<AppState>> {
     Router::new()
+        .route("/profile", get(profile_page))
+        .route("/profile", post(change_profile))
+        .route("/logout", get(logout))
+        .route_layer(login_required!(AuthBackend, login_url = "/login"))
         .route("/login", get(login_page))
         .route("/login", post(login_password))
         .route("/register", get(register_page))
         .route("/register", post(register_password))
-        .route("/logout", get(logout))
 }
 
 /// login page template
@@ -51,6 +55,28 @@ struct RegisterTemplate {}
 #[axum::debug_handler]
 async fn register_page() -> Result<impl IntoResponse, InternalError> {
     Ok(Html(RegisterTemplate {}.render()?))
+}
+
+#[derive(Template)]
+#[template(path = "profile.html")]
+struct ProfileTemplate {
+    player: Player,
+}
+
+// Any filter defined in the module `filters` is accessible in your template.
+pub mod filters {
+    use chrono::{DateTime, Local, Utc};
+
+    pub fn local_date(dt: &DateTime<Utc>, fmt: &str) -> rinja::Result<String> {
+        let local_time = dt.with_timezone(&Local);
+        Ok(local_time.format(fmt).to_string())
+    }
+}
+
+#[axum::debug_handler]
+async fn profile_page(auth_session: AuthSession) -> Result<impl IntoResponse, InternalError> {
+    let player = auth_session.user.expect("player must be logged in");
+    Ok(Html(ProfileTemplate { player }.render()?))
 }
 
 #[derive(Deserialize)]
@@ -122,7 +148,16 @@ async fn register_password(
     let new_username = register_form.new_username.clone();
     let new_password = register_form.new_password.clone();
     let confirm_password = register_form.confirm_password.clone();
-    // validate credentials
+    // validate username is unique
+    if let Some(_player) = auth_session
+        .backend
+        .get_player_by_name(&new_username)
+        .await
+        .map_err(Backend)?
+    {
+        return Err(RegisterError::UserAlreadyRegistered(new_username));
+    }
+    // validate new credentials
     validate_name_password(&new_username, &new_password)?;
     if new_password != confirm_password {
         Err(RegisterError::UnconfirmedPassword)
@@ -157,6 +192,59 @@ async fn register_password(
             // failed authentication
             Err(RegisterError::Authentication(register_form.new_username))
         }
+    }
+}
+
+async fn change_profile(
+    mut auth_session: AuthSession,
+    Form(register_form): Form<RegisterForm>,
+) -> Result<impl IntoResponse, RegisterError> {
+    let orig_player = auth_session.user.clone().expect("player must be logged in");
+    let new_username = register_form.new_username.clone();
+    let new_password = register_form.new_password.clone();
+    let new_confirm_password = register_form.confirm_password.clone();
+    // validate username, if not the same, is unique
+    if let Some(found_player) = auth_session
+        .backend
+        .get_player_by_name(&new_username)
+        .await
+        .map_err(Backend)?
+    {
+        if found_player.uuid != orig_player.uuid {
+            return Err(RegisterError::UserAlreadyRegistered(new_username));
+        }
+    }
+    // validate new credentials
+    validate_name_password(&new_username, &new_password)?;
+    if new_password != new_confirm_password {
+        Err(RegisterError::UnconfirmedPassword)
+    } else {
+        let new_password_hash = register_form.password_hash();
+        let new_player = Player {
+            name: new_username,
+            password_hash: new_password_hash,
+            updated: datetime_now(),
+            ..orig_player.clone()
+        };
+        auth_session
+            .backend
+            .change_player(&orig_player, &new_player)
+            .await
+            .map_err(Backend)?;
+        // if the player record changed, re-authenticate
+        if let Some(player) = auth_session
+            .authenticate(register_form.credentials())
+            .await?
+        {
+            // update session so user is logged in
+            auth_session.login(&player).await?;
+        }
+        let mut response = StatusCode::OK.into_response();
+        response.headers_mut().insert(
+            "HX-Location",
+            HeaderValue::try_from("/".to_string()).expect("next value"),
+        );
+        Ok(response)
     }
 }
 

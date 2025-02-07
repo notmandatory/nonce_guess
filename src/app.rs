@@ -124,7 +124,8 @@ impl App {
                 delete_task.abort_handle(),
             ]))
             .await?;
-        //update_task.await??;
+
+        update_task.await??;
         delete_task.await??;
 
         Ok(())

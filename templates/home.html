@@ -3,7 +3,12 @@ content%} {% include "nav.html" %}
 <section
   class="mb-6 flex scroll-mt-10 flex-col items-center justify-center gap-8 p-6"
 >
-  <section id="target" hx-get="/target/table" hx-trigger="every 5s">
+  <section
+    id="target"
+    hx-get="/target/table"
+    hx-trigger="every 5s"
+    class="mb-6 flex scroll-mt-10 flex-col items-center justify-center p-6"
+  >
     {% include "target_table.html" %}
   </section>
   {% if add_guess %}
@@ -45,7 +50,12 @@ content%} {% include "nav.html" %}
     </div>
   </div>
   {% endif %}
-  <section id="guesses" hx-get="/guess/table" hx-trigger="every 5s">
+  <section
+    id="guesses"
+    hx-get="/guess/table"
+    hx-trigger="every 5s"
+    class="mb-6 flex scroll-mt-10 flex-col items-center justify-center p-6"
+  >
     {% include "guess_table.html" %}
   </section>
 </section>

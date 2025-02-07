@@ -1,0 +1,170 @@
+{% extends "base.html" %} {% block title %}Profile{% endblock %} {% block
+content%} {% include "nav.html" %}
+<section
+  class="mb-6 flex scroll-mt-10 flex-col items-center justify-center p-6"
+>
+  <div class="flex items-center">
+    <div class="sm:flex-auto">
+      <h2 class="text-grey-900 text-lg leading-6 font-semibold">Player</h2>
+    </div>
+  </div>
+  <div class="flex items-center">
+    <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+      <div
+        class="ring-opacity-5 overflow-hidden ring-1 shadow-sm ring-black sm:rounded-lg"
+      >
+        <table class="min-w-full divide-y divide-gray-300">
+          <tbody class="divide-y divide-gray-200 bg-white">
+          <tr>
+            <td
+              class="py-4 pr-3 pl-4 font-mono text-base font-medium whitespace-nowrap text-gray-900 sm:pl-6"
+            >
+              Name
+            </td>
+            <td
+              class="px-3 py-4 font-mono text-base whitespace-nowrap text-gray-500"
+            >
+              {{ player.name }}
+            </td>
+          </tr>
+          <tr>
+            <td
+              class="py-4 pr-3 pl-4 font-mono text-base font-medium whitespace-nowrap text-gray-900 sm:pl-6"
+            >
+              Last Login
+            </td>
+            <td
+              class="px-3 py-4 font-mono text-base whitespace-nowrap text-gray-500"
+            >
+              {{ player.last_login|local_date("%Y-%m-%d %H:%M:%S") }}
+            </td>
+          </tr>
+          <tr>
+            <td
+              class="py-4 pr-3 pl-4 font-mono text-base font-medium whitespace-nowrap text-gray-900 sm:pl-6"
+            >
+              Updated
+            </td>
+            <td
+              class="px-3 py-4 font-mono text-base whitespace-nowrap text-gray-500"
+            >
+              {{ player.updated|local_date("%Y-%m-%d %H:%M:%S") }}
+            </td>
+          </tr>
+          <tr>
+            <td
+              class="py-4 pr-3 pl-4 font-mono text-base font-medium whitespace-nowrap text-gray-900 sm:pl-6"
+            >
+              Created
+            </td>
+            <td
+              class="px-3 py-4 font-mono text-base whitespace-nowrap text-gray-500"
+            >
+              {{ player.created|local_date("%Y-%m-%d %H:%M:%S")}}
+            </td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <section
+    id="change_password_form"
+    class="flex scroll-mt-10 flex-col items-center justify-center gap-4 p-6"
+  >
+    <form id="group" novalidate hx-post="/profile">
+      <div class="mb-1 mt-6">
+        <label
+          class="text-l text-left font-bold text-slate-900"
+          for="new_username"
+        >Name</label>
+        <input
+          id="new_username"
+          class="peer mt-2 block w-60 rounded-md p-1.5 ring-1 text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+          name="new_username"
+          type="text"
+          autocomplete="new-username"
+          required
+          value="{{ player.name }}"
+          pattern="[0-9a-zA-Z_]{3,20}"
+        />
+        <div
+          class="hidden w-60 gap-6 py-1.5 font-semibold leading-6 text-red-600 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
+        >
+          <p id="name_error_message">
+            Must be 3-20 characters and only include A-Z, 0-9, and underscore.
+          </p>
+        </div>
+      </div>
+      <div class="relative mb-1 mt-6">
+        <label
+          class="text-l text-left font-bold text-slate-900"
+          for="new_password"
+        >Password</label
+        >
+        <input
+          id="new_password"
+          class="peer mt-2 block w-60 rounded-md ring-1 p-1.5 text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+          name="new_password"
+          type="password"
+          autocomplete="new-password"
+          required
+          placeholder=" "
+          pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_\.\-])[A-Za-z\d@$!%*?&#^_\.\-]{8,20}"
+        />
+        <button id="show" name="show" tabindex="-1" type="button" hx-on:click="togglePassword('show','new_password')">
+          Show
+        </button>
+        <div
+          class="hidden w-60 gap-6 p-1.5 font-semibold leading-6 text-red-600 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block"
+        >
+          <p id="password_error_message">
+            Must be 8-20 characters and include at least one uppercase, one
+            lowercase, one number, and one special character [ @ $ ! % * ? & # ^ _ . - ].
+          </p>
+        </div>
+        <div class="mb-1 mt-6">
+          <label
+            class="mt-6 text-l text-left font-bold text-slate-900"
+            for="confirm_password"
+          >Confirm Password</label
+          >
+          <input
+            id="confirm_password"
+            class="peer mt-2 block w-60 rounded-md p-1.5 ring-1 text-gray-900 shadow-xs ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500"
+            name="confirm_password"
+            type="password"
+            autocomplete="new-password"
+            required
+            placeholder=" "
+            pattern="^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^_\.\-])[A-Za-z\d@$!%*?&#^_\.\-]{8,20}"
+          />
+          <button id="show_confirm" name="show_confirm" tabindex="-1" type="button"
+                  hx-on:click="togglePassword('show_confirm','confirm_password')">
+            Show
+          </button>
+        </div>
+      </div>
+      <div class="mt-6 flex items-center justify-center gap-x-6">
+        <button
+          class="flex justify-center rounded-md bg-indigo-600 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-100 shadow-xs hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 group-invalid:pointer-events-none group-invalid:opacity-30"
+          type="submit"
+        >
+          Save
+        </button>
+        <button
+          class="flex justify-center rounded-md bg-indigo-300 px-3 py-1.5 text-sm font-semibold leading-6 text-gray-900 shadow-xs hover:bg-indigo-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 group-invalid:pointer-events-none group-invalid:opacity-30"
+          onclick="history.back()"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+    <div class="gap-6 py-1.5 font-semibold leading-6 text-green-600">
+      <p id="flash_message"></p>
+    </div>
+  </section>
+
+</section>
+{% endblock %}

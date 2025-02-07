@@ -1,12 +1,12 @@
 use super::backend::AuthBackend;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use tracing::error;
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 // A helper functions that return the current date time.
-fn datetime_now() -> DateTime<Utc> {
+pub fn datetime_now() -> DateTime<Utc> {
     Utc::now()
 }
 
@@ -21,9 +21,11 @@ pub struct Player {
     pub permissions: HashSet<Permission>,
     pub roles: HashSet<Uuid>,
     #[serde(default = "datetime_now")]
-    pub created_at: DateTime<Utc>,
+    pub last_login: DateTime<Utc>,
     #[serde(default = "datetime_now")]
-    pub updated_at: DateTime<Utc>,
+    pub updated: DateTime<Utc>,
+    #[serde(default = "datetime_now")]
+    pub created: DateTime<Utc>,
 }
 
 impl Default for Player {
@@ -34,8 +36,9 @@ impl Default for Player {
             password_hash: "".to_string(),
             permissions: Default::default(),
             roles: Default::default(),
-            created_at: datetime_now(),
-            updated_at: datetime_now(),
+            last_login: datetime_now(),
+            updated: datetime_now(),
+            created: datetime_now(),
         }
     }
 }

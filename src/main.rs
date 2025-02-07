@@ -16,12 +16,7 @@ mod types;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(EnvFilter::new(std::env::var("RUST_LOG").unwrap_or_else(
-            |_| {
-                format!(
-                    "axum_login=debug,tower_sessions=debug,sqlx=warn,tower_http=debug,{}=debug",
-                    env!("CARGO_CRATE_NAME")
-                )
-            },
+            |_| format!("{}=debug", env!("CARGO_CRATE_NAME")),
         )))
         .with(tracing_subscriber::fmt::layer())
         .try_init()?;
