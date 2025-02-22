@@ -7,7 +7,6 @@ resolver = "2"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1"
 async-trait = "0.1.85"
 axum = { version = "0.7", features = ["http2", "macros"] }
 axum-embed = "0.1.0"
@@ -15,17 +14,15 @@ axum-extra = { version = "0.9", features = [] }
 axum-login = { version = "0.16.0" }
 chrono = { version = "0.4.39", features = ["serde"] }
 ciborium = { version = "0.2" }
-log = "0.4.20"
-mime_guess = { version = "2" }
 password-auth = { version = "1.0.0" }
 redb = "2.4"
+regex = "1.11.1"
 reqwest = { version = "0.12", features = ["json", "native-tls"] }
+rinja = "0.3.5"
 rust-embed = { version = "8.4.0", features = ["axum-ex"] }
 serde = { version = "1", features = ["derive", "rc"] }
 serde_json = "1.0"
 serde_with = "3.8.1"
-strum = "0.26"
-strum_macros = "0.26"
 tempfile = "3.15.0"
 thiserror = "2"
 time = "0.3.36"
@@ -37,6 +34,3 @@ tower-sessions = { version = "0.13.0", default-features = false, features = ["ax
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.6", features = ["v4", "v7", "serde"] }
-bytes = "1.9.0"
-regex = "1.11.1"
-rinja = "0.3.5"

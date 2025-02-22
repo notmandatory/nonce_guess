@@ -45,19 +45,7 @@ impl Default for Player {
 
 // Permissions that can be granted to a player.
 #[serde_with::skip_serializing_none]
-#[derive(
-    Ord,
-    PartialOrd,
-    Serialize,
-    Deserialize,
-    Debug,
-    Clone,
-    Eq,
-    PartialEq,
-    Hash,
-    strum_macros::Display,
-    strum_macros::EnumString,
-)]
+#[derive(Ord, PartialOrd, Serialize, Deserialize, Debug, Clone, Eq, PartialEq, Hash)]
 #[serde(deny_unknown_fields)]
 pub enum Permission {
     /// Assign a player to the admin role.

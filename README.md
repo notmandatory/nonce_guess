@@ -1,20 +1,17 @@
 # Nonce Guess
 
-### Setup
-
-1. Install system packages: gcc, libssl-dev, pkg-config
-2. cargo install trunk
-
 ### Local Testing
 
 Tools:
 
-1. Install [tailwindcss](https://github.com/tailwindlabs/tailwindcss) [standalone-cli](https://tailwindcss.com/blog/standalone-cli) and make sure it's in your executables path, for example:
-   ```shell
-   curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.0.0/tailwindcss-macos-arm64
-   chmod +x tailwindcss-macos-arm64
-   mv tailwindcss-macos-arm64 ~/bin/tailwindcss
-   ```
+1.
+Install [tailwindcss](https://github.com/tailwindlabs/tailwindcss) [standalone-cli](https://tailwindcss.com/blog/standalone-cli)
+and make sure it's in your executables path, for example:
+```shell
+curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.0.0/tailwindcss-macos-arm64
+chmod +x tailwindcss-macos-arm64
+mv tailwindcss-macos-arm64 ~/bin/tailwindcss
+```
 2. Prettier plugin for tailwindcss (optional):
    ```shell
    npm install -D prettier prettier-plugin-tailwindcss

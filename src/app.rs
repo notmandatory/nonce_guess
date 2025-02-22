@@ -20,7 +20,7 @@ use tower_cookies::cookie::SameSite;
 use tower_sessions::cookie::Key;
 
 #[derive(RustEmbed, Clone)]
-#[folder = "./assets"]
+#[folder = "assets/"]
 struct Assets;
 
 pub struct App {

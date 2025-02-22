@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use log::warn;
 use redb::{Database, Key, TableDefinition, TypeName, Value};
 use std::cmp::Ordering;
 use std::sync::Arc;
@@ -10,7 +9,7 @@ use tower_sessions::{
     session::{Id, Record},
     session_store, ExpiredDeletion, SessionStore,
 };
-
+use tracing::warn;
 // TODO: extract this into it's own lib
 
 const ID_RECORD: TableDefinition<IdKey, RecordValue> = TableDefinition::new("session_id_record");
