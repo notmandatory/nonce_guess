@@ -100,7 +100,7 @@ impl App {
             self.http_client.clone(),
             self.mempool_url.clone(),
         )
-        .map(Arc::new)?;
+            .map(Arc::new)?;
 
         // task to update block hash when confirmed
         let update_task =
@@ -115,7 +115,7 @@ impl App {
             .with_state(app_state)
             .nest_service("/assets", serve_assets);
 
-        let listener = tokio::net::TcpListener::bind("0.0.0.0:8081").await.unwrap();
+        let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
 
         // Ensure we use a shutdown signal to abort the tasks.
         axum::serve(listener, router.into_make_service())

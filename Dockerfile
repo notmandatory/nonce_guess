@@ -16,7 +16,7 @@ RUN apt update && apt upgrade -y
 RUN apt install -y pkg-config openssl
 
 COPY --from=builder /usr/src/nonce_guess/target/release/ng_server .
-EXPOSE 8081
+EXPOSE 8080
 
 VOLUME /data
 

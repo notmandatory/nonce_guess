@@ -42,13 +42,13 @@ Build and Run:
 
 To run the resulting self-contained binary use `RUST_LOG=debug target/release/ng_server`.
 
-In test or release mode the web client can be found at: http://localhost:8081/
+In test or release mode the web client can be found at: http://localhost:8080/
 
 ### Build Docker Container
 
 1. `docker build -t nonce_guess .`
-2. `docker run -d --rm -it -p 8081:8081 -v nonce_vol:/data --name nonce_guess_app nonce_guess`
-3. Visit http://localhost:8081/ in a browser
+2. `docker run -d --rm -it -p 8080:8080 -v nonce_vol:/data --name nonce_guess_app nonce_guess`
+3. Visit http://localhost:8080/ in a browser
 
 Note: on linux above steps also work with `podman` instead of `docker`.
 
@@ -57,3 +57,15 @@ Note: on linux above steps also work with `podman` instead of `docker`.
 1. `docker login`
 2. `docker build --platform linux/amd64 -t notmandatory/nonce_guess:latest .`
 3. `docker push notmandatory/nonce_guess:latest`
+
+### Install helm chart (local Docker Desktop)
+
+1. `cd helm; helm package nonce-guess`
+2. `helm install nonce-guess ./nonce-guess`
+3. export POD_NAME and CONTAINER_PORT and start port-forward
+   ```
+    export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=nonce-guess,app.kubernetes.io/instance=nonce-guess" -o jsonpath="{.items[0].metadata.name}")
+    export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")`
+    kubectl --namespace default port-forward $POD_NAME 8080:$CONTAINER_PORT
+   ```
+6. Visit http://127.0.0.1:8080 to use test application
