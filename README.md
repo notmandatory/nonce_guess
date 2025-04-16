@@ -5,13 +5,16 @@
 Tools:
 
 1.
+
 Install [tailwindcss](https://github.com/tailwindlabs/tailwindcss) [standalone-cli](https://tailwindcss.com/blog/standalone-cli)
 and make sure it's in your executables path, for example:
+
 ```shell
 curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.0.0/tailwindcss-macos-arm64
 chmod +x tailwindcss-macos-arm64
 mv tailwindcss-macos-arm64 ~/bin/tailwindcss
 ```
+
 2. Prettier plugin for tailwindcss (optional):
    ```shell
    npm install -D prettier prettier-plugin-tailwindcss
@@ -48,3 +51,9 @@ In test or release mode the web client can be found at: http://localhost:8081/
 3. Visit http://localhost:8081/ in a browser
 
 Note: on linux above steps also work with `podman` instead of `docker`.
+
+### Build for pushing to DockerHub
+
+1. `docker login`
+2. `docker build --platform linux/amd64 -t notmandatory/nonce_guess:latest .`
+3. `docker push notmandatory/nonce_guess:latest`

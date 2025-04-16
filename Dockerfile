@@ -4,9 +4,8 @@ WORKDIR /usr/src/nonce_guess
 COPY . .
 
 RUN apt update && apt upgrade -y
-RUN apt install curl
-RUN curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.0.0/tailwindcss-linux-x64 && mv tailwindcss-linux-x64 tailwindcss && chmod +x tailwindcss
-ENV PATH=$PATH:.
+RUN apt install -y npm
+RUN npm install -g tailwindcss @tailwindcss/cli
 RUN cargo build --release
 
 FROM docker.io/library/debian:bookworm-slim
