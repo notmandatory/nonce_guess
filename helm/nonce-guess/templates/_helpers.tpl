@@ -60,3 +60,45 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{/*
+Allow the release namespace to be overridden for multi-namespace deployments in combined charts
+*/}}
+{{- define "nonce-guess.namespace" -}}
+  {{- if .Values.namespaceOverride -}}
+    {{- .Values.namespaceOverride -}}
+  {{- else -}}
+    {{- .Release.Namespace -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for ingress.
+*/}}
+{{- define "nonce-guess.ingress.apiVersion" -}}
+  {{- if and (.Capabilities.APIVersions.Has "networking.k8s.io/v1") (semverCompare ">= 1.19-0" .Capabilities.KubeVersion.Version) -}}
+      {{- print "networking.k8s.io/v1" -}}
+  {{- else if .Capabilities.APIVersions.Has "networking.k8s.io/v1beta1" -}}
+    {{- print "networking.k8s.io/v1beta1" -}}
+  {{- else -}}
+    {{- print "extensions/v1beta1" -}}
+  {{- end -}}
+{{- end -}}
+{{/*
+Return if ingress is stable.
+*/}}
+{{- define "nonce-guess.ingress.isStable" -}}
+  {{- eq (include "nonce-guess.ingress.apiVersion" .) "networking.k8s.io/v1" -}}
+{{- end -}}
+{{/*
+Return if ingress supports ingressClassName.
+*/}}
+{{- define "nonce-guess.ingress.supportsIngressClassName" -}}
+  {{- or (eq (include "nonce-guess.ingress.isStable" .) "true") (and (eq (include "nonce-guess.ingress.apiVersion" .) "networking.k8s.io/v1beta1") (semverCompare ">= 1.18-0" .Capabilities.KubeVersion.Version)) -}}
+{{- end -}}
+{{/*
+Return if ingress supports pathType.
+*/}}
+{{- define "nonce-guess.ingress.supportsPathType" -}}
+  {{- or (eq (include "nonce-guess.ingress.isStable" .) "true") (and (eq (include "nonce-guess.ingress.apiVersion" .) "networking.k8s.io/v1beta1") (semverCompare ">= 1.18-0" .Capabilities.KubeVersion.Version)) -}}
+{{- end -}}
