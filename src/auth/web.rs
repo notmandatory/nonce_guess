@@ -250,18 +250,11 @@ async fn change_profile(
 
 fn validate_name_password(new_username: &str, new_password: &str) -> Result<(), RegisterError> {
     let name_re = Regex::new(r#"[0-9a-zA-Z_]{3,20}"#).unwrap();
-    let password_re = RegexSet::new([
-        r#".*[a-z]"#,
-        r#".*[A-Z]"#,
-        r#".*\d"#,
-        r#".*[@$!%*?&#^_\.\-]"#,
-        r#"[A-Za-z\d@$!%*?&#^_\.\-]{8,20}"#,
-    ])
-    .unwrap();
+    let password_re = Regex::new(r#"[A-Za-z\d@$!%*?&#^_\.\-]{4,20}"#).unwrap();
 
     if !name_re.is_match(new_username) {
         Err(RegisterError::InvalidName)
-    } else if !password_re.matches(new_password).matched_all() {
+    } else if !password_re.is_match(new_password) {
         Err(RegisterError::InvalidPassword)
     } else {
         Ok(())
