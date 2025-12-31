@@ -89,7 +89,6 @@ impl GuessBackend {
             write_txn.commit().map_err(Into::<InternalError>::into)
         })
         .await?
-        .map_err(Into::<InternalError>::into)
     }
 
     pub async fn insert_guess(&self, height: u32, guess: Guess) -> Result<bool, InternalError> {
@@ -131,9 +130,7 @@ pub async fn continuously_update_target_nonce(
     interval.tick().await; // The first tick completes immediately; skip.
     loop {
         interval.tick().await;
-        update_target_nonce(guess_backend.clone())
-            .await
-            .map_err(Into::<InternalError>::into)?
+        update_target_nonce(guess_backend.clone()).await?
     }
 }
 

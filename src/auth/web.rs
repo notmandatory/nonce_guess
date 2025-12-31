@@ -10,7 +10,7 @@ use axum::{Form, Router};
 use axum_login::login_required;
 use axum_login::Error::Backend;
 use password_auth::generate_hash;
-use regex::{Regex, RegexSet};
+use regex::Regex;
 use rinja::Template;
 use serde::Deserialize;
 use std::sync::Arc;
@@ -250,7 +250,7 @@ async fn change_profile(
 
 fn validate_name_password(new_username: &str, new_password: &str) -> Result<(), RegisterError> {
     let name_re = Regex::new(r#"[0-9a-zA-Z_]{3,20}"#).unwrap();
-    let password_re = Regex::new(r#"[A-Za-z\d@$!%*?&#^_\.\-]{4,20}"#).unwrap();
+    let password_re = Regex::new(r#"[0-9a-zA-Z\d@$!%*?&#^_\.\-]{4,20}"#).unwrap();
 
     if !name_re.is_match(new_username) {
         Err(RegisterError::InvalidName)
@@ -289,7 +289,7 @@ impl IntoResponse for RegisterError {
                 (
                     StatusCode::OK,
                     [("HX-Retarget", "#flash_message")],
-                    "Password must be 8-20 characters and include at least one uppercase, one lowercase, one number, and one special character [ @ $ ! % * ? & # ^ _ ].",
+                    "Password must be 4-20 characters and only include upper or lowercase A-Z, 0-9, and special characters [ @ $ ! % * ? & # ^ _ ].",
                 )
                     .into_response()
             }

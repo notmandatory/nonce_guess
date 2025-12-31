@@ -5,9 +5,8 @@
 Tools:
 
 1.
-
 Install [tailwindcss](https://github.com/tailwindlabs/tailwindcss) [standalone-cli](https://tailwindcss.com/blog/standalone-cli)
-and make sure it's in your executables path, for example:
+and make sure it's in your executable path, for example:
 
 ```shell
 curl -sLO https://github.com/tailwindlabs/tailwindcss/releases/download/v4.0.0/tailwindcss-macos-arm64
@@ -15,7 +14,7 @@ chmod +x tailwindcss-macos-arm64
 mv tailwindcss-macos-arm64 ~/bin/tailwindcss
 ```
 
-2. Prettier plugin for tailwindcss (optional):
+2. Install prettier plugin for tailwindcss (optional):
    ```shell
    npm install -D prettier prettier-plugin-tailwindcss
    ```
@@ -25,8 +24,8 @@ Build and Run:
 1. Set env variables, defaults are
    ```shell
    # if `NONCE_GUESS_DB_FILE` not set the data is stored in temporary file.
-   export NONCE_GUESS_DB_FILE=/data/nonce_guess.redb
-   export NONCE_GUESS_MEMPOOL_URL=/data/nonce_guess.redb
+   export NONCE_GUESS_DB_FILE="/data/nonce_guess.redb"
+   export NONCE_GUESS_MEMPOOL_URL="https://mempool.space"
    ```
 2. Start the server, it will also serve the latest web client
    ```shell

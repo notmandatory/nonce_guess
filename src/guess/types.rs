@@ -1,6 +1,5 @@
 use crate::types::InternalError;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 use uuid::Uuid;
 
 /// A players guess for a target block nonce.

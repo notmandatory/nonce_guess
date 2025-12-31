@@ -100,7 +100,7 @@ impl App {
             self.http_client.clone(),
             self.mempool_url.clone(),
         )
-            .map(Arc::new)?;
+        .map(Arc::new)?;
 
         // task to update block hash when confirmed
         let update_task =

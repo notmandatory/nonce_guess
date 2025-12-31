@@ -2,7 +2,6 @@ use super::backend::AuthBackend;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use tracing::error;
 use uuid::Uuid;
 
 // A helper functions that return the current date time.
